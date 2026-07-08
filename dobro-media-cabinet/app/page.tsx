@@ -89,6 +89,8 @@ export default function Page() {
   }, [activities]);
 
   const selectedAssignments = selected ? assignments.filter(a => a.activity_id === selected.id) : [];
+  const selectedSubmitAssignment = selectedAssignments.find(a => a.id === submitAssignment);
+  const selectedAdminComment = selectedSubmitAssignment?.admin_comment?.trim();
 
   async function claimActivity() {
     if (!selected) return;
@@ -308,7 +310,13 @@ export default function Page() {
             <div className="modal-block"><h4>Как делать</h4><p>{selected.how_to}</p></div>
             <div className="modal-block"><h4>Что собрать</h4><p>{selected.collect}</p></div>
             <div className="modal-block modal-wide"><h4>Что отправить</h4><p>{selected.send_to_admin}</p></div>
-            <div className="modal-block modal-wide"><h4>Кто взял активность</h4><div className="assignments">{selectedAssignments.length ? selectedAssignments.map(a => <div className="assignment" key={a.id}><b>{a.volunteer_name}</b><span className="status">{a.status}</span>{a.spent_minutes ? <span> · {minutesToHours(a.spent_minutes)} ч.</span> : null}</div>) : <p>Пока никто не взял. Можно быть первым.</p>}</div></div>
+            <div className="modal-block modal-wide"><h4>Кто взял активность</h4><div className="assignments">{selectedAssignments.length ? selectedAssignments.map(a => {
+              const adminComment = a.admin_comment?.trim();
+              return <div className={`assignment ${a.status === 'На доработке' ? 'needs-work' : ''}`} key={a.id}>
+                <div className="assignment-row"><b>{a.volunteer_name}</b><span className="status">{a.status}</span>{a.spent_minutes ? <span> · {minutesToHours(a.spent_minutes)} ч.</span> : null}</div>
+                {adminComment ? <div className="admin-comment"><strong>{a.status === 'На доработке' ? 'Что нужно доработать' : 'Комментарий администратора'}</strong><p>{adminComment}</p></div> : null}
+              </div>;
+            }) : <p>Пока никто не взял. Можно быть первым.</p>}</div></div>
           </div>
           <div className="form">
             <h3>Взять активность</h3>
@@ -319,6 +327,7 @@ export default function Page() {
           <div className="form">
             <h3>Сдать материал</h3>
             <label><b>Кто сдаёт</b><select value={submitAssignment} onChange={e => setSubmitAssignment(e.target.value)}><option value="">Выбери свою запись</option>{selectedAssignments.map(a => <option key={a.id} value={a.id}>{a.volunteer_name} — {a.status}</option>)}</select></label>
+            {selectedAdminComment ? <div className="revision-note"><b>{selectedSubmitAssignment?.status === 'На доработке' ? 'Нужно доработать' : 'Комментарий администратора'}</b><p>{selectedAdminComment}</p></div> : null}
             <label><b>Потраченное время, часы</b><input className="input" value={spent} onChange={e => setSpent(e.target.value)} placeholder="Например: 1,5" type="number" step="0.5" /></label>
             <label><b>Ссылка на материалы</b><input className="input" value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="Ссылка на фото, видео или документ" /></label>
             <label><b>Комментарий</b><textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Что сделал(а), что нужно проверить" /></label>
