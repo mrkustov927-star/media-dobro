@@ -1,1 +1,1 @@
-Redeploy trigger for Vercel after fixing stable Next.js and React versions.
+Redeploy trigger after fixing API routes for Vercel build.
