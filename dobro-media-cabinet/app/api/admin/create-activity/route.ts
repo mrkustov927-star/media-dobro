@@ -3,16 +3,22 @@ import { getSupabaseAdmin, requireAdminPin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
+function parseJulyDay(value: unknown) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/\d{1,2}/);
+  return match ? Number(match[0]) : 0;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     requireAdminPin(body.pin);
 
-    const day = Number(body.day || 0);
+    const day = parseJulyDay(body.day);
     const title = String(body.title || '').trim();
 
-    if (!day || !title) {
-      return NextResponse.json({ error: 'Укажите дату и название активности' }, { status: 400 });
+    if (!day || day < 1 || day > 31 || !title) {
+      return NextResponse.json({ error: 'Укажите дату июля и название активности' }, { status: 400 });
     }
 
     const supabaseAdmin = getSupabaseAdmin();
