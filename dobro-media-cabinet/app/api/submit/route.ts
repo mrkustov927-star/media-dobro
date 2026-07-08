@@ -4,6 +4,18 @@ import { minutesToHoursText, notifyAdmin } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
+function getTopicFromComment(comment?: string | null) {
+  const firstLine = String(comment || '').split('\n')[0]?.trim() || '';
+  return firstLine.startsWith('Тема:') ? firstLine.replace(/^Тема:\s*/, '').trim() : '';
+}
+
+function buildVolunteerComment(topic: string, comment: string) {
+  const lines = [];
+  if (topic) lines.push(`Тема: ${topic}`);
+  if (comment) lines.push(topic ? `Комментарий: ${comment}` : comment);
+  return lines.join('\n');
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -16,15 +28,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Укажите задание и потраченное время' }, { status: 400 });
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: existing } = await supabaseAdmin
+      .from('assignments')
+      .select('volunteer_comment')
+      .eq('id', assignment_id)
+      .single();
+
+    const topicTitle = getTopicFromComment(existing?.volunteer_comment);
+    const savedVolunteerComment = buildVolunteerComment(topicTitle, volunteer_comment);
+
     const updatePayload = {
       spent_minutes,
       material_link: material_url,
-      volunteer_comment,
+      volunteer_comment: savedVolunteerComment,
       status: 'Материал сдан',
       updated_at: new Date().toISOString()
     };
 
-    const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from('assignments')
       .update(updatePayload)
@@ -48,6 +69,7 @@ export async function POST(request: Request) {
       'Добро.Медиа: материал сдан на проверку',
       '',
       `Волонтёр: ${data?.volunteer_name || 'не указано'}`,
+      topicTitle ? `Тема: ${topicTitle}` : null,
       `Активность: ${activityTitle}`,
       `Потраченное время: ${minutesToHoursText(spent_minutes)}`,
       material_url ? 'Ссылка на материалы указана в админке.' : 'Ссылка на материалы не указана.',
@@ -56,7 +78,7 @@ export async function POST(request: Request) {
       'Материал ждёт проверки в админке.'
     ];
 
-    await notifyAdmin(messageLines.join('\n'));
+    await notifyAdmin(messageLines.filter(Boolean).join('\n'));
 
     return NextResponse.json({ data });
   } catch (error: any) {
