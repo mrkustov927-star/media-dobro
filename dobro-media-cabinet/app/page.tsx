@@ -33,6 +33,19 @@ function fallbackActivities(): Activity[] {
   }));
 }
 
+function hoursToMinutes(value: string, fallbackHours = 1) {
+  const normalized = String(value || '').replace(',', '.');
+  const hours = Number(normalized);
+  if (!Number.isFinite(hours) || hours <= 0) return Math.round(fallbackHours * 60);
+  return Math.round(hours * 60);
+}
+
+function minutesToHours(minutes?: number | null) {
+  if (!minutes) return '';
+  const hours = minutes / 60;
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace('.', ',');
+}
+
 export default function Page() {
   const [activities, setActivities] = useState<Activity[]>(fallbackActivities());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -92,7 +105,11 @@ export default function Page() {
     const res = await fetch('/api/claim', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ activity_id: selected.id, volunteer_name: name, planned_minutes: Number(planned || 60) })
+      body: JSON.stringify({
+        activity_id: selected.id,
+        volunteer_name: name,
+        planned_minutes: hoursToMinutes(planned, 1)
+      })
     });
     const json = await res.json();
     if (!res.ok) setMessage(json.error || 'Не удалось взять активность. Попробуй ещё раз.');
@@ -113,7 +130,12 @@ export default function Page() {
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignment_id: submitAssignment, spent_minutes: Number(spent || 0), material_url: materialUrl, volunteer_comment: comment })
+      body: JSON.stringify({
+        assignment_id: submitAssignment,
+        spent_minutes: hoursToMinutes(spent, 1),
+        material_url: materialUrl,
+        volunteer_comment: comment
+      })
     });
     const json = await res.json();
     if (!res.ok) setMessage(json.error || 'Не удалось сдать материал. Попробуй ещё раз.');
@@ -177,10 +199,10 @@ export default function Page() {
             <div className="head"><h2 className="title">Как <span className="red">работаем</span></h2><p className="note">Путь от выбора задания до проверки материала.</p></div>
             <div className="steps">
               <div className="step"><h3>Выбери активность</h3><p>Открой календарь, нажми на дату или задание и прочитай карточку-подсказку.</p></div>
-              <div className="step"><h3>Возьми в работу</h3><p>Укажи имя и планируемое время. Все увидят, что задание уже занято.</p></div>
+              <div className="step"><h3>Возьми в работу</h3><p>Укажи имя и планируемое время в часах. Все увидят, что задание уже занято.</p></div>
               <div className="step"><h3>Собери материал</h3><p>Сними фото, видео, возьми комментарий, уточни дату, место и участников.</p></div>
               <div className="step"><h3>Подготовь черновик</h3><p>Напиши пост или собери короткий ролик. Не придумывай факты и цитаты.</p></div>
-              <div className="step"><h3>Сдай на проверку</h3><p>Прикрепи ссылку на материалы и напиши, что получилось и что нужно проверить.</p></div>
+              <div className="step"><h3>Сдай на проверку</h3><p>Укажи затраченное время в часах, прикрепи ссылку на материалы и напиши, что получилось.</p></div>
               <div className="step"><h3>Доработай</h3><p>Если будет комментарий, исправь материал и отправь обновлённую версию.</p></div>
             </div>
           </div>
@@ -236,12 +258,22 @@ export default function Page() {
           </div>
         </section>
 
+        <section className="section" id="materials">
+          <div className="wrap">
+            <div className="head"><h2 className="title">Что собрать <span className="red">с события</span></h2><p className="note">Минимальный комплект материалов, который помогает куратору быстро подготовить публикацию.</p></div>
+            <div className="grid2">
+              <div className="check"><h3>Медиаматериалы</h3><ul className="tick-list"><li>10–15 хороших фотографий: общий план, участники, детали, эмоции.</li><li>5–10 коротких видеофрагментов по 5–15 секунд.</li><li>1–2 мини-интервью или коротких комментария.</li><li>Вертикальные кадры для историй и клипов.</li></ul></div>
+              <div className="check"><h3>Информация</h3><ul className="tick-list"><li>Название события.</li><li>Дата и место проведения.</li><li>Кто участвовал.</li><li>Что происходило и почему это важно.</li><li>Кого нужно поблагодарить.</li></ul></div>
+            </div>
+          </div>
+        </section>
+
         <section className="section" id="templates">
           <div className="wrap">
             <div className="head"><h2 className="title">Шаблоны <span className="red">сообщений</span></h2><p className="note">Можно копировать и заполнять под своё задание.</p></div>
             <div className="grid2">
-              <div className="check"><h3>Черновик поста</h3><div className="template">Название события:\nКогда прошло:\nГде прошло:\nКто участвовал:\nЧто происходило:\nЧто было самым интересным:\nПочему это важно:\nРеальный комментарий участника:\nКого благодарим:\nКакие фото/видео прилагаются:</div></div>
-              <div className="check"><h3>Сообщение на проверку</h3><div className="template">Евгений Валерьевич, здравствуйте!\n\nОтправляю материал для проверки.\n\nСобытие:\nДата:\nМесто:\nКто участвовал:\n\nКратко о событии:\nЧерновик поста:\nСсылка на фото/видео:\nКомментарий участника:\nЧто нужно проверить:</div></div>
+              <div className="check"><h3>Черновик поста</h3><div className="template">Название события:{'\n'}Когда прошло:{'\n'}Где прошло:{'\n'}Кто участвовал:{'\n'}Что происходило:{'\n'}Что было самым интересным:{'\n'}Почему это важно:{'\n'}Реальный комментарий участника:{'\n'}Кого благодарим:{'\n'}Какие фото/видео прилагаются:</div></div>
+              <div className="check"><h3>Сообщение на проверку</h3><div className="template">Евгений Валерьевич, здравствуйте!{'\n\n'}Отправляю материал для проверки.{'\n\n'}Событие:{'\n'}Дата:{'\n'}Место:{'\n'}Кто участвовал:{'\n\n'}Кратко о событии:{'\n'}Черновик поста:{'\n'}Ссылка на фото/видео:{'\n'}Комментарий участника:{'\n'}Что нужно проверить:{'\n'}Затраченное время: __ ч.</div></div>
             </div>
           </div>
         </section>
@@ -254,6 +286,12 @@ export default function Page() {
               <div className="card"><h3>Не придумываем</h3><p>Факты, имена и цитаты должны быть настоящими. Если не уверен — лучше уточнить.</p></div>
               <div className="card"><h3>Снимаем уважительно</h3><p>Не используем неудачные фото людей, не снимаем слишком близко без согласия и не публикуем личные данные.</p></div>
             </div>
+          </div>
+        </section>
+
+        <section className="section" id="hashtags">
+          <div className="wrap hashtag-box">
+            <span>#ДвижениеПервых10</span><span>#ПервыеКемь</span><span>#КемскийОкруг</span>
           </div>
         </section>
       </main>
@@ -270,18 +308,18 @@ export default function Page() {
             <div className="modal-block"><h4>Как делать</h4><p>{selected.how_to}</p></div>
             <div className="modal-block"><h4>Что собрать</h4><p>{selected.collect}</p></div>
             <div className="modal-block modal-wide"><h4>Что отправить</h4><p>{selected.send_to_admin}</p></div>
-            <div className="modal-block modal-wide"><h4>Кто взял активность</h4><div className="assignments">{selectedAssignments.length ? selectedAssignments.map(a => <div className="assignment" key={a.id}><b>{a.volunteer_name}</b><span className="status">{a.status}</span>{a.spent_minutes ? <span> · {a.spent_minutes} мин.</span> : null}</div>) : <p>Пока никто не взял. Можно быть первым.</p>}</div></div>
+            <div className="modal-block modal-wide"><h4>Кто взял активность</h4><div className="assignments">{selectedAssignments.length ? selectedAssignments.map(a => <div className="assignment" key={a.id}><b>{a.volunteer_name}</b><span className="status">{a.status}</span>{a.spent_minutes ? <span> · {minutesToHours(a.spent_minutes)} ч.</span> : null}</div>) : <p>Пока никто не взял. Можно быть первым.</p>}</div></div>
           </div>
           <div className="form">
             <h3>Взять активность</h3>
             <label><b>Имя и фамилия</b><input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Например: Иванова Анна" /></label>
-            <label><b>Планируемое время, минут</b><input className="input" value={planned} onChange={e => setPlanned(e.target.value)} placeholder="Например: 60" type="number" /></label>
+            <label><b>Планируемое время, часы</b><input className="input" value={planned} onChange={e => setPlanned(e.target.value)} placeholder="Например: 1" type="number" step="0.5" /></label>
             <button className="btn primary" onClick={claimActivity}>Взять активность</button>
           </div>
           <div className="form">
             <h3>Сдать материал</h3>
             <label><b>Кто сдаёт</b><select value={submitAssignment} onChange={e => setSubmitAssignment(e.target.value)}><option value="">Выбери свою запись</option>{selectedAssignments.map(a => <option key={a.id} value={a.id}>{a.volunteer_name} — {a.status}</option>)}</select></label>
-            <label><b>Потраченное время, минут</b><input className="input" value={spent} onChange={e => setSpent(e.target.value)} placeholder="Например: 75" type="number" /></label>
+            <label><b>Потраченное время, часы</b><input className="input" value={spent} onChange={e => setSpent(e.target.value)} placeholder="Например: 1,5" type="number" step="0.5" /></label>
             <label><b>Ссылка на материалы</b><input className="input" value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="Ссылка на фото, видео или документ" /></label>
             <label><b>Комментарий</b><textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Что сделал(а), что нужно проверить" /></label>
             <button className="btn primary" onClick={sendMaterial}>Сдать на проверку</button>
@@ -294,5 +332,5 @@ export default function Page() {
 }
 
 function Header() {
-  return <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · кабинет медиа-волонтёра</div></a><nav className="nav"><a href="#about">О проекте</a><a href="#roles">Роли</a><a href="#workflow">Как работаем</a><a href="#calendar">Календарь</a><a href="#templates">Шаблоны</a><a href="/admin">Администратор</a></nav></div></header>;
+  return <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · кабинет медиа-волонтёра</div></a><nav className="nav"><a href="#about">О проекте</a><a href="#roles">Роли</a><a href="#workflow">Как работаем</a><a href="#calendar">Календарь</a><a href="#materials">Что собрать</a><a href="#templates">Шаблоны</a><a href="/admin">Администратор</a></nav></div></header>;
 }
