@@ -4,19 +4,26 @@ import { initialActivities } from '@/lib/initialActivities';
 
 export const dynamic = 'force-dynamic';
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) return String((error as any).message);
+  return 'Ошибка';
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     requireAdminPin(body.pin);
 
     const supabaseAdmin = getSupabaseAdmin();
-    const { count, error: countError } = await supabaseAdmin
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from('activities')
-      .select('id', { count: 'exact', head: true });
+      .select('id')
+      .limit(1);
 
-    if (countError) throw countError;
+    if (existingError) throw existingError;
 
-    if ((count || 0) > 0) {
+    if (existing && existing.length > 0) {
       return NextResponse.json({ ok: true, inserted: 0, message: 'Календарь уже заполнен.' });
     }
 
@@ -28,7 +35,9 @@ export async function POST(request: Request) {
     if (error) throw error;
 
     return NextResponse.json({ ok: true, inserted: data?.length || 0 });
-  } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error.message || 'Ошибка' }, { status: 500 });
+  } catch (error: unknown) {
+    const message = getErrorMessage(error);
+    console.error('seed-calendar failed:', message, error);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
