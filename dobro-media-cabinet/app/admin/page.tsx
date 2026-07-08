@@ -5,12 +5,19 @@ import { supabase } from '@/lib/supabaseClient';
 import type { Activity, Assignment, AssignmentStatus } from '@/lib/types';
 
 const statuses: AssignmentStatus[] = ['Взято в работу','Материал сдан','На доработке','Проверено','Зачтено','Отменено'];
+const activityTypes = [
+  ['r', 'Красная: важная акция'],
+  ['b', 'Синяя: тематическое задание'],
+  ['d', 'Серая: своя тема']
+];
 
 export default function AdminPage() {
   const [pin, setPin] = useState('');
   const [activities, setActivities] = useState<Activity[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [message, setMessage] = useState('');
+  const [newDay, setNewDay] = useState('');
+  const [newTitle, setNewTitle] = useState('');
 
   async function loadData() {
     const [{ data: a }, { data: s }] = await Promise.all([
@@ -33,7 +40,7 @@ export default function AdminPage() {
 
   const activityById = useMemo(() => new Map(activities.map(a => [a.id, a])), [activities]);
 
-  async function updateAssignment(id: string, field: string, value: any) {
+  async function updateAssignment(id: string, field: string, value: unknown) {
     const current = assignments.find(a => a.id === id);
     if (!current) return;
     setMessage('');
@@ -57,11 +64,46 @@ export default function AdminPage() {
     }
   }
 
+  async function updateActivity(id: string, field: string, value: unknown) {
+    setMessage('');
+    const res = await fetch('/api/admin/update-activity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, id, field, value })
+    });
+    const json = await res.json();
+    if (!res.ok) setMessage(json.error || 'Не удалось сохранить активность');
+    else {
+      setMessage('Активность обновлена. Изменение видно всем на сайте.');
+      await loadData();
+    }
+  }
+
+  async function createActivity() {
+    setMessage('');
+    const res = await fetch('/api/admin/create-activity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, day: Number(newDay), title: newTitle })
+    });
+    const json = await res.json();
+    if (!res.ok) setMessage(json.error || 'Не удалось создать активность');
+    else {
+      setMessage('Активность создана. Теперь её можно отредактировать ниже.');
+      setNewDay('');
+      setNewTitle('');
+      await loadData();
+    }
+  }
+
   return <>
     <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · администратор</div></a><nav className="nav"><a href="/">Кабинет ребят</a></nav></div></header>
     <main>
-      <section className="hero"><div className="wrap hero-card"><div><div className="kicker">Админ-панель</div><h1>Живой учёт <span className="red">активностей</span></h1><p className="lead">Здесь Кустов Евгений Валерьевич может менять статусы, фиксировать время и оставлять комментарии. Изменения сразу видны ребятам.</p></div><div className="hero-panel"><h3>Доступ администратора</h3><input className="input" type="password" value={pin} onChange={e => setPin(e.target.value)} placeholder="Введите ADMIN_PIN"/><p>PIN хранится в переменных окружения Vercel и не публикуется в коде.</p></div></div></section>
-      <section className="section"><div className="wrap"><div className="head"><h2 className="title">Заявки <span className="red">волонтёров</span></h2><p className="note">Меняйте статус, время и комментарий прямо здесь. Для сохранения нужен PIN администратора.</p></div>{message && <p><b>{message}</b></p>}<div className="admin-grid"><table className="table"><thead><tr><th>Дата / активность</th><th>Волонтёр</th><th>Статус</th><th>Время</th><th>Материал</th><th>Комментарий администратора</th></tr></thead><tbody>{assignments.map(a => { const activity = activityById.get(a.activity_id); return <tr key={a.id}><td><b>{activity ? `${activity.day} июля` : '—'}</b><br/>{activity?.title || 'Активность не найдена'}</td><td>{a.volunteer_name}<br/><small>План: {a.planned_minutes || '—'} мин.</small></td><td><select value={a.status} onChange={e => updateAssignment(a.id, 'status', e.target.value)}>{statuses.map(s => <option key={s} value={s}>{s}</option>)}</select></td><td><input className="input" type="number" defaultValue={a.spent_minutes || ''} placeholder="мин." onBlur={e => updateAssignment(a.id, 'spent_minutes', e.target.value ? Number(e.target.value) : null)}/></td><td>{a.material_link ? <a href={a.material_link} target="_blank">Открыть</a> : '—'}<br/><small>{a.volunteer_comment}</small></td><td><textarea defaultValue={a.admin_comment || ''} onBlur={e => updateAssignment(a.id, 'admin_comment', e.target.value)} placeholder="Комментарий для ребят"/></td></tr>; })}</tbody></table></div></div></section>
+      <section className="hero"><div className="wrap hero-card"><div><div className="kicker">Админ-панель</div><h1>Живой учёт <span className="red">активностей</span></h1><p className="lead">Здесь Кустов Евгений Валерьевич может менять задания, статусы, время и комментарии. Изменения сразу видны ребятам.</p></div><div className="hero-panel"><h3>Доступ администратора</h3><input className="input" type="password" value={pin} onChange={e => setPin(e.target.value)} placeholder="Введите ADMIN_PIN"/><p>PIN хранится в переменных окружения Vercel и не публикуется в коде.</p></div></div></section>
+
+      <section className="section"><div className="wrap"><div className="head"><h2 className="title">Заявки <span className="red">волонтёров</span></h2><p className="note">Меняйте статус, время и комментарий. Для сохранения нужен PIN администратора.</p></div>{message && <p><b>{message}</b></p>}<div className="admin-grid"><table className="table"><thead><tr><th>Дата / активность</th><th>Волонтёр</th><th>Статус</th><th>Время</th><th>Материал</th><th>Комментарий администратора</th></tr></thead><tbody>{assignments.map(a => { const activity = activityById.get(a.activity_id); return <tr key={a.id}><td><b>{activity ? `${activity.day} июля` : '—'}</b><br/>{activity?.title || 'Активность не найдена'}</td><td>{a.volunteer_name}<br/><small>План: {a.planned_minutes || '—'} мин.</small></td><td><select value={a.status} onChange={e => updateAssignment(a.id, 'status', e.target.value)}>{statuses.map(s => <option key={s} value={s}>{s}</option>)}</select></td><td><input className="input" type="number" defaultValue={a.spent_minutes || ''} placeholder="мин." onBlur={e => updateAssignment(a.id, 'spent_minutes', e.target.value ? Number(e.target.value) : null)}/></td><td>{a.material_link ? <a href={a.material_link} target="_blank">Открыть</a> : '—'}<br/><small>{a.volunteer_comment}</small></td><td><textarea defaultValue={a.admin_comment || ''} onBlur={e => updateAssignment(a.id, 'admin_comment', e.target.value)} placeholder="Комментарий для ребят"/></td></tr>; })}</tbody></table></div></div></section>
+
+      <section className="section"><div className="wrap"><div className="head"><h2 className="title">Редактировать <span className="red">календарь</span></h2><p className="note">Здесь можно менять задания, подсказки и видимость активностей. После сохранения ребята увидят изменения в календаре.</p></div><div className="card"><h3>Добавить активность</h3><div className="form"><input className="input" type="number" min="8" max="31" value={newDay} onChange={e => setNewDay(e.target.value)} placeholder="Дата июля, например 22"/><input className="input" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Название активности"/><button className="btn primary" onClick={createActivity}>Добавить</button></div></div><br/><table className="table"><thead><tr><th>Дата / название</th><th>Метка</th><th>Подсказки для ребят</th><th>Время / видимость</th></tr></thead><tbody>{activities.map(a => <tr key={a.id}><td><b>{a.day} июля</b><br/><input className="input" defaultValue={a.title} onBlur={e => updateActivity(a.id, 'title', e.target.value)}/></td><td><input className="input" defaultValue={a.tag} onBlur={e => updateActivity(a.id, 'tag', e.target.value)}/><select defaultValue={a.type} onChange={e => updateActivity(a.id, 'type', e.target.value)}>{activityTypes.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></td><td><textarea defaultValue={a.description} onBlur={e => updateActivity(a.id, 'description', e.target.value)} placeholder="О чём это"/><textarea defaultValue={a.task} onBlur={e => updateActivity(a.id, 'task', e.target.value)} placeholder="Твоё задание"/><textarea defaultValue={a.how_to} onBlur={e => updateActivity(a.id, 'how_to', e.target.value)} placeholder="Как делать"/><textarea defaultValue={a.collect} onBlur={e => updateActivity(a.id, 'collect', e.target.value)} placeholder="Что собрать"/><textarea defaultValue={a.send_to_admin} onBlur={e => updateActivity(a.id, 'send_to_admin', e.target.value)} placeholder="Что отправить"/></td><td><input className="input" type="number" defaultValue={a.estimated_minutes} onBlur={e => updateActivity(a.id, 'estimated_minutes', Number(e.target.value || 60))}/><label style={{display:'flex',gap:8,alignItems:'center',marginTop:10,fontWeight:800}}><input type="checkbox" defaultChecked={a.is_active} onChange={e => updateActivity(a.id, 'is_active', e.target.checked)}/> Показывать ребятам</label></td></tr>)}</tbody></table></div></section>
     </main>
   </>;
 }
