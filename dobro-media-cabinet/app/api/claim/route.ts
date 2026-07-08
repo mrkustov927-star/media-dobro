@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { minutesToHoursText, notifyAdmin } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,23 @@ export async function POST(request: Request) {
       .single();
 
     if (error) throw error;
+
+    const { data: activity } = await supabaseAdmin
+      .from('activities')
+      .select('day,title')
+      .eq('id', activity_id)
+      .single();
+
+    await notifyAdmin([
+      'Добро.Медиа: активность взята',
+      '',
+      `Волонтёр: ${volunteer_name}`,
+      `Активность: ${activity ? `${activity.day} июля — ${activity.title}` : activity_id}`,
+      `Планируемое время: ${minutesToHoursText(planned_minutes)}`,
+      '',
+      'Проверьте запись в админке.'
+    ].join('\n'));
+
     return NextResponse.json({ data });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Ошибка' }, { status: 500 });
