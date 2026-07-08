@@ -10,7 +10,7 @@ function getTopicFromComment(comment?: string | null) {
 }
 
 function buildVolunteerComment(topic: string, comment: string) {
-  const lines = [];
+  const lines: string[] = [];
   if (topic) lines.push(`Тема: ${topic}`);
   if (comment) lines.push(topic ? `Комментарий: ${comment}` : comment);
   return lines.join('\n');
