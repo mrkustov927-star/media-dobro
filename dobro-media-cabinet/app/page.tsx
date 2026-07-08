@@ -328,7 +328,7 @@ export default function Page() {
             <div className="modal-block"><h4>Как делать</h4><p>{selected.how_to}</p></div>
             <div className="modal-block"><h4>Что собрать</h4><p>{selected.collect}</p></div>
             <div className="modal-block modal-wide"><h4>Что отправить</h4><p>{selected.send_to_admin}</p></div>
-            <div className="modal-block modal-wide"><h4>Кто взял активность</h4><div className="assignments">{selectedAssignments.length ? selectedAssignments.map(a => {
+            {selectedAssignments.length ? <div className="modal-block modal-wide"><h4>Кто взял активность</h4><div className="assignments">{selectedAssignments.map(a => {
               const adminComment = a.admin_comment?.trim();
               const topic = getAssignmentTopic(a);
               return <div className={`assignment ${a.status === 'На доработке' ? 'needs-work' : ''}`} key={a.id}>
@@ -336,7 +336,7 @@ export default function Page() {
                 {topic ? <div className="topic-note"><b>Тема</b><span>{topic}</span></div> : null}
                 {adminComment ? <div className="admin-comment"><strong>{a.status === 'На доработке' ? 'Что нужно доработать' : 'Комментарий администратора'}</strong><p>{adminComment}</p></div> : null}
               </div>;
-            }) : <p>Пока никто не взял. Можно быть первым.</p>}</div></div>
+            })}</div></div> : null}
           </div>
           <div className="form">
             <h3>Взять активность</h3>
