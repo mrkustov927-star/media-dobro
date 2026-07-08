@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { minutesToHoursText, notifyAdmin } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,31 @@ export async function POST(request: Request) {
       .single();
 
     if (error) throw error;
+
+    let activityTitle = data?.activity_id || 'не указано';
+    if (data?.activity_id) {
+      const { data: activity } = await supabaseAdmin
+        .from('activities')
+        .select('day,title')
+        .eq('id', data.activity_id)
+        .single();
+      if (activity) activityTitle = `${activity.day} июля — ${activity.title}`;
+    }
+
+    const messageLines = [
+      'Добро.Медиа: материал сдан на проверку',
+      '',
+      `Волонтёр: ${data?.volunteer_name || 'не указано'}`,
+      `Активность: ${activityTitle}`,
+      `Потраченное время: ${minutesToHoursText(spent_minutes)}`,
+      material_url ? 'Ссылка на материалы указана в админке.' : 'Ссылка на материалы не указана.',
+      volunteer_comment ? `Комментарий: ${volunteer_comment}` : 'Комментарий не указан.',
+      '',
+      'Материал ждёт проверки в админке.'
+    ];
+
+    await notifyAdmin(messageLines.join('\n'));
+
     return NextResponse.json({ data });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Ошибка' }, { status: 500 });
