@@ -290,10 +290,9 @@ export default function Page() {
 
         <section className="section" id="templates">
           <div className="wrap">
-            <div className="head"><h2 className="title">Шаблоны <span className="red">сообщений</span></h2><p className="note">Можно копировать и заполнять под своё задание.</p></div>
-            <div className="grid2">
+            <div className="head"><h2 className="title">Шаблон <span className="red">черновика</span></h2><p className="note">Можно использовать как памятку при подготовке текста перед сдачей материала в календаре.</p></div>
+            <div className="grid2 template-single">
               <div className="check"><h3>Черновик поста</h3><div className="template">Название события:{'\n'}Когда прошло:{'\n'}Где прошло:{'\n'}Кто участвовал:{'\n'}Что происходило:{'\n'}Что было самым интересным:{'\n'}Почему это важно:{'\n'}Реальный комментарий участника:{'\n'}Кого благодарим:{'\n'}Какие фото/видео прилагаются:</div></div>
-              <div className="check"><h3>Сообщение на проверку</h3><div className="template">Евгений Валерьевич, здравствуйте!{'\n\n'}Отправляю материал для проверки.{'\n\n'}Событие:{'\n'}Дата:{'\n'}Место:{'\n'}Кто участвовал:{'\n\n'}Кратко о событии:{'\n'}Черновик поста:{'\n'}Ссылка на фото/видео:{'\n'}Комментарий участника:{'\n'}Что нужно проверить:{'\n'}Затраченное время: __ ч.</div></div>
             </div>
           </div>
         </section>
