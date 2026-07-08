@@ -46,11 +46,22 @@ function minutesToHours(minutes?: number | null) {
   return Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace('.', ',');
 }
 
+function getAssignmentTopic(assignment: Assignment) {
+  const firstLine = String(assignment.volunteer_comment || '').split('\n')[0]?.trim() || '';
+  return firstLine.startsWith('Тема:') ? firstLine.replace(/^Тема:\s*/, '').trim() : '';
+}
+
+function assignmentLabel(assignment: Assignment) {
+  const topic = getAssignmentTopic(assignment);
+  return topic ? `${assignment.volunteer_name} — ${topic}` : assignment.volunteer_name;
+}
+
 export default function Page() {
   const [activities, setActivities] = useState<Activity[]>(fallbackActivities());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selected, setSelected] = useState<Activity | null>(null);
   const [name, setName] = useState('');
+  const [topicTitle, setTopicTitle] = useState('');
   const [planned, setPlanned] = useState('');
   const [submitAssignment, setSubmitAssignment] = useState('');
   const [spent, setSpent] = useState('');
@@ -91,12 +102,17 @@ export default function Page() {
   const selectedAssignments = selected ? assignments.filter(a => a.activity_id === selected.id) : [];
   const selectedSubmitAssignment = selectedAssignments.find(a => a.id === submitAssignment);
   const selectedAdminComment = selectedSubmitAssignment?.admin_comment?.trim();
+  const selectedIsOwnTopic = selected?.type === 'd';
 
   async function claimActivity() {
     if (!selected) return;
     setMessage('');
     if (!name.trim()) {
       setMessage('Напиши имя и фамилию, чтобы взять активность.');
+      return;
+    }
+    if (selectedIsOwnTopic && !topicTitle.trim()) {
+      setMessage('Напиши название своей темы, например: Игры, Интервью, Летний двор.');
       return;
     }
     if (selected.id.startsWith('start-')) {
@@ -110,6 +126,7 @@ export default function Page() {
       body: JSON.stringify({
         activity_id: selected.id,
         volunteer_name: name,
+        topic_title: selectedIsOwnTopic ? topicTitle : '',
         planned_minutes: hoursToMinutes(planned, 1)
       })
     });
@@ -118,6 +135,7 @@ export default function Page() {
     else {
       setMessage('Активность взята. Теперь она видна всем ребятам.');
       setName('');
+      setTopicTitle('');
       setPlanned('');
       await loadData();
     }
@@ -201,7 +219,7 @@ export default function Page() {
             <div className="head"><h2 className="title">Как <span className="red">работаем</span></h2><p className="note">Путь от выбора задания до проверки материала.</p></div>
             <div className="steps">
               <div className="step"><h3>Выбери активность</h3><p>Открой календарь, нажми на дату или задание и прочитай карточку-подсказку.</p></div>
-              <div className="step"><h3>Возьми в работу</h3><p>Укажи имя и планируемое время в часах. Все увидят, что задание уже занято.</p></div>
+              <div className="step"><h3>Возьми в работу</h3><p>Укажи имя, тему для своего сюжета и планируемое время в часах.</p></div>
               <div className="step"><h3>Собери материал</h3><p>Сними фото, видео, возьми комментарий, уточни дату, место и участников.</p></div>
               <div className="step"><h3>Подготовь черновик</h3><p>Напиши пост или собери короткий ролик. Не придумывай факты и цитаты.</p></div>
               <div className="step"><h3>Сдай на проверку</h3><p>Укажи затраченное время в часах, прикрепи ссылку на материалы и напиши, что получилось.</p></div>
@@ -213,7 +231,7 @@ export default function Page() {
         <section className="section" id="calendar">
           <div className="wrap">
             <div className="head"><h2 className="title">Календарь <span className="red">заданий</span></h2><p className="note">Нажми на активность внутри даты: откроется карточка с объяснением, заданием и подсказками.</p></div>
-            <div className="calendar-help"><b>Активности начинаются с 8 июля.</b><span>В календаре видно, кто уже взял задание и на каком оно статусе.</span></div>
+            <div className="calendar-help"><b>Активности начинаются с 8 июля.</b><span>В календаре видно, кто уже взял задание, какую тему выбрал и на каком оно статусе.</span></div>
             <div className="calendar">
               <div className="cal-head"><div>Неделя</div>{weekDays.map(d => <div key={d}>{d}</div>)}</div>
               {weeks.map(([label, days]) => (
@@ -225,10 +243,10 @@ export default function Page() {
                       {day && <span className="num">{day}</span>}
                       {list.map(item => {
                         const taken = assignments.filter(a => a.activity_id === item.id);
-                        return <button className="activity-pill" key={item.id} onClick={() => { setSelected(item); setMessage(''); }}>
+                        return <button className="activity-pill" key={item.id} onClick={() => { setSelected(item); setTopicTitle(''); setMessage(''); }}>
                           <span className={`tag ${item.type}`}>{item.tag}</span>
                           <b>{item.title}</b>
-                          <span>{taken.length ? `Взяли: ${taken.map(t => t.volunteer_name).join(', ')}` : 'Свободно'}</span>
+                          <span>{taken.length ? `Взяли: ${taken.map(assignmentLabel).join(', ')}` : 'Свободно'}</span>
                         </button>;
                       })}
                     </div>;
@@ -312,8 +330,10 @@ export default function Page() {
             <div className="modal-block modal-wide"><h4>Что отправить</h4><p>{selected.send_to_admin}</p></div>
             <div className="modal-block modal-wide"><h4>Кто взял активность</h4><div className="assignments">{selectedAssignments.length ? selectedAssignments.map(a => {
               const adminComment = a.admin_comment?.trim();
+              const topic = getAssignmentTopic(a);
               return <div className={`assignment ${a.status === 'На доработке' ? 'needs-work' : ''}`} key={a.id}>
                 <div className="assignment-row"><b>{a.volunteer_name}</b><span className="status">{a.status}</span>{a.spent_minutes ? <span> · {minutesToHours(a.spent_minutes)} ч.</span> : null}</div>
+                {topic ? <div className="topic-note"><b>Тема</b><span>{topic}</span></div> : null}
                 {adminComment ? <div className="admin-comment"><strong>{a.status === 'На доработке' ? 'Что нужно доработать' : 'Комментарий администратора'}</strong><p>{adminComment}</p></div> : null}
               </div>;
             }) : <p>Пока никто не взял. Можно быть первым.</p>}</div></div>
@@ -321,12 +341,13 @@ export default function Page() {
           <div className="form">
             <h3>Взять активность</h3>
             <label><b>Имя и фамилия</b><input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Например: Иванова Анна" /></label>
+            {selectedIsOwnTopic ? <label><b>Название своей темы</b><input className="input" value={topicTitle} onChange={e => setTopicTitle(e.target.value)} placeholder="Например: Игры, интервью, летний двор" /></label> : null}
             <label><b>Планируемое время, часы</b><input className="input" value={planned} onChange={e => setPlanned(e.target.value)} placeholder="Например: 1" type="number" step="0.5" /></label>
             <button className="btn primary" onClick={claimActivity}>Взять активность</button>
           </div>
           <div className="form">
             <h3>Сдать материал</h3>
-            <label><b>Кто сдаёт</b><select value={submitAssignment} onChange={e => setSubmitAssignment(e.target.value)}><option value="">Выбери свою запись</option>{selectedAssignments.map(a => <option key={a.id} value={a.id}>{a.volunteer_name} — {a.status}</option>)}</select></label>
+            <label><b>Кто сдаёт</b><select value={submitAssignment} onChange={e => setSubmitAssignment(e.target.value)}><option value="">Выбери свою запись</option>{selectedAssignments.map(a => <option key={a.id} value={a.id}>{assignmentLabel(a)} — {a.status}</option>)}</select></label>
             {selectedAdminComment ? <div className="revision-note"><b>{selectedSubmitAssignment?.status === 'На доработке' ? 'Нужно доработать' : 'Комментарий администратора'}</b><p>{selectedAdminComment}</p></div> : null}
             <label><b>Потраченное время, часы</b><input className="input" value={spent} onChange={e => setSpent(e.target.value)} placeholder="Например: 1,5" type="number" step="0.5" /></label>
             <label><b>Ссылка на материалы</b><input className="input" value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="Ссылка на фото, видео или документ" /></label>
