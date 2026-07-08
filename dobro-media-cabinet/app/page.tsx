@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { initialActivities } from '@/lib/initialActivities';
 import type { Activity, Assignment } from '@/lib/types';
 
 const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -13,8 +14,27 @@ const weeks = [
   ['27–31 июля', [27, 28, 29, 30, 31, null, null]]
 ] as const;
 
+function fallbackActivities(): Activity[] {
+  return initialActivities.map((item, index) => ({
+    id: `start-${item.day}-${index}`,
+    month: 7,
+    title: item.title,
+    day: item.day,
+    tag: item.tag,
+    type: item.type as Activity['type'],
+    description: item.description,
+    task: item.task,
+    how_to: item.how_to,
+    collect: item.collect,
+    send_to_admin: item.send_to_admin,
+    estimated_minutes: item.estimated_minutes,
+    is_active: item.is_active,
+    sort_order: item.sort_order
+  }));
+}
+
 export default function Page() {
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activities, setActivities] = useState<Activity[]>(fallbackActivities());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selected, setSelected] = useState<Activity | null>(null);
   const [name, setName] = useState('');
@@ -26,11 +46,12 @@ export default function Page() {
   const [message, setMessage] = useState('');
 
   async function loadData() {
+    await fetch('/api/bootstrap-calendar', { method: 'POST' }).catch(() => null);
     const [{ data: a }, { data: s }] = await Promise.all([
       supabase.from('activities').select('*').order('sort_order'),
       supabase.from('assignments').select('*').order('created_at', { ascending: false })
     ]);
-    setActivities((a || []) as Activity[]);
+    setActivities(((a && a.length) ? a : fallbackActivities()) as Activity[]);
     setAssignments((s || []) as Assignment[]);
   }
 
@@ -59,13 +80,22 @@ export default function Page() {
   async function claimActivity() {
     if (!selected) return;
     setMessage('');
+    if (!name.trim()) {
+      setMessage('Напиши имя и фамилию, чтобы взять активность.');
+      return;
+    }
+    if (selected.id.startsWith('start-')) {
+      await loadData();
+      setMessage('Календарь обновляется. Открой активность ещё раз и нажми кнопку повторно.');
+      return;
+    }
     const res = await fetch('/api/claim', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ activity_id: selected.id, volunteer_name: name, planned_minutes: Number(planned) })
     });
     const json = await res.json();
-    if (!res.ok) setMessage(json.error || 'Не удалось взять активность');
+    if (!res.ok) setMessage(json.error || 'Не удалось взять активность. Попробуй ещё раз.');
     else {
       setMessage('Активность взята. Теперь она видна всем ребятам.');
       setName('');
@@ -75,13 +105,17 @@ export default function Page() {
 
   async function sendMaterial() {
     setMessage('');
+    if (!submitAssignment) {
+      setMessage('Сначала выбери свою запись в списке.');
+      return;
+    }
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ assignment_id: submitAssignment, spent_minutes: Number(spent), material_url: materialUrl, volunteer_comment: comment })
     });
     const json = await res.json();
-    if (!res.ok) setMessage(json.error || 'Не удалось сдать материал');
+    if (!res.ok) setMessage(json.error || 'Не удалось сдать материал. Попробуй ещё раз.');
     else {
       setMessage('Материал отправлен на проверку Кустову Евгению Валерьевичу.');
       setSubmitAssignment('');
@@ -100,14 +134,15 @@ export default function Page() {
             <div>
               <div className="kicker">Добро.Медиа</div>
               <h1>Кабинет <span className="red">медиа-волонтёра</span></h1>
-              <p className="lead">Выбирай активность в календаре, снимай репортаж, пиши пост или монтируй видео. Готовый материал отправляй на проверку Кустову Евгению Валерьевичу.</p>
+              <p className="lead">Здесь ты выбираешь задание, снимаешь репортаж, пишешь пост или монтируешь короткое видео. Готовый материал отправляется на проверку Кустову Евгению Валерьевичу.</p>
             </div>
             <div className="hero-panel">
-              <h3>Как работать</h3>
+              <h3>Как всё работает</h3>
               <ol>
                 <li>Открой календарь и выбери активность.</li>
-                <li>Нажми «Взять активность».</li>
-                <li>Сними, напиши или смонтируй материал.</li>
+                <li>Прочитай подсказку и нажми «Взять активность».</li>
+                <li>Сними фото, видео, собери факты и комментарии.</li>
+                <li>Напиши пост или смонтируй ролик.</li>
                 <li>Сдай материал на проверку.</li>
               </ol>
             </div>
@@ -118,9 +153,9 @@ export default function Page() {
           <div className="wrap">
             <div className="head">
               <h2 className="title">Календарь <span className="red">заданий</span></h2>
-              <p className="note">Нажми на активность внутри даты: откроется подсказка, что делать, как делать и что отправить на проверку.</p>
+              <p className="note">Нажми на активность внутри даты: откроется карточка с объяснением, заданием и подсказками.</p>
             </div>
-            <div className="calendar-help"><b>Активности начинаются с 8 июля.</b><span>Ребята видят, кто уже взял задание и на каком оно статусе.</span></div>
+            <div className="calendar-help"><b>Активности начинаются с 8 июля.</b><span>В календаре видно, кто уже взял задание и на каком оно статусе.</span></div>
             <div className="calendar">
               <div className="cal-head"><div>Неделя</div>{weekDays.map(d => <div key={d}>{d}</div>)}</div>
               {weeks.map(([label, days]) => (
@@ -150,12 +185,38 @@ export default function Page() {
           <div className="wrap">
             <div className="head">
               <h2 className="title">Инструкция <span className="red">для ребят</span></h2>
-              <p className="note">Короткая памятка: как снять репортаж, написать пост, смонтировать ролик и отправить всё на проверку.</p>
+              <p className="note">Памятка для самостоятельной работы: что снять, как написать, как смонтировать и что отправить.</p>
             </div>
             <div className="grid3">
-              <div className="card"><h3>Сними историю</h3><p>Общий план, действие, эмоции, детали и финальный кадр. Лучше 10–15 фото и 5–7 коротких видео.</p></div>
-              <div className="card"><h3>Собери факты</h3><p>Дата, место, кто участвовал, что происходило, почему это важно, кого благодарим.</p></div>
-              <div className="card"><h3>Отправь на проверку</h3><p>Пост, фото, видео и комментарии отправляй Кустову Евгению Валерьевичу. Самостоятельно не публикуем.</p></div>
+              <div className="card"><h3>1. Разберись в событии</h3><p>Ответь на вопросы: что произошло, где, когда, кто участвовал, почему это важно и что хочется показать другим.</p></div>
+              <div className="card"><h3>2. Сними историю</h3><p>Нужны общий план, участники в действии, эмоции, детали и финальный кадр. Хороший репортаж — это маленькая история.</p></div>
+              <div className="card"><h3>3. Собери факты</h3><p>Запиши дату, место, участников, главное действие, результат, благодарности и реальные комментарии.</p></div>
+            </div>
+            <br />
+            <div className="grid3">
+              <div className="card"><h3>Фото</h3><p>Сними 10–15 кадров: место, действие, эмоции, детали, общий финальный кадр. Удали размытые и неудачные фото.</p></div>
+              <div className="card"><h3>Видео</h3><p>Снимай короткими фрагментами по 5–10 секунд. Держи телефон устойчиво. Для клипов чаще подходит вертикальный формат.</p></div>
+              <div className="card"><h3>Интервью</h3><p>Задай 2–3 простых вопроса: что запомнилось, почему это важно, какое настроение, что хочется пожелать другим.</p></div>
+            </div>
+            <br />
+            <div className="grid3">
+              <div className="card"><h3>Пост</h3><p>Структура: что произошло, где и когда, кто участвовал, что делали, почему это важно, живой момент, благодарность.</p></div>
+              <div className="card"><h3>Монтаж</h3><p>Ролик лучше делать 20–40 секунд: сильный первый кадр, процесс, эмоции, детали и финал. Не перегружай эффектами.</p></div>
+              <div className="card"><h3>Отправка</h3><p>Прикрепи пост, фото, видео, комментарии и ссылку на материалы. Всё отправляется Кустову Евгению Валерьевичу на проверку.</p></div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" id="rules">
+          <div className="wrap">
+            <div className="head">
+              <h2 className="title">Правила <span className="red">медиа-волонтёра</span></h2>
+              <p className="note">Мы рассказываем о людях уважительно, честно и аккуратно.</p>
+            </div>
+            <div className="grid3">
+              <div className="card"><h3>Не публикуем сами</h3><p>Материалы сначала отправляются на проверку. Публикация возможна только после согласования.</p></div>
+              <div className="card"><h3>Не придумываем</h3><p>Факты, имена и цитаты должны быть настоящими. Если не уверен — лучше уточнить.</p></div>
+              <div className="card"><h3>Снимаем уважительно</h3><p>Не используем неудачные фото людей, не снимаем слишком близко без согласия и не публикуем личные данные.</p></div>
             </div>
           </div>
         </section>
@@ -200,5 +261,5 @@ export default function Page() {
 }
 
 function Header() {
-  return <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · кабинет медиа-волонтёра</div></a><nav className="nav"><a href="#calendar">Календарь</a><a href="#manual">Инструкция</a><a href="/admin">Администратор</a></nav></div></header>;
+  return <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · кабинет медиа-волонтёра</div></a><nav className="nav"><a href="#calendar">Календарь</a><a href="#manual">Инструкция</a><a href="#rules">Правила</a></nav></div></header>;
 }
