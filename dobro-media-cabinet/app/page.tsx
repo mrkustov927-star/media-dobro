@@ -38,9 +38,9 @@ export default function Page() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selected, setSelected] = useState<Activity | null>(null);
   const [name, setName] = useState('');
-  const [planned, setPlanned] = useState('60');
+  const [planned, setPlanned] = useState('');
   const [submitAssignment, setSubmitAssignment] = useState('');
-  const [spent, setSpent] = useState('60');
+  const [spent, setSpent] = useState('');
   const [materialUrl, setMaterialUrl] = useState('');
   const [comment, setComment] = useState('');
   const [message, setMessage] = useState('');
@@ -92,13 +92,14 @@ export default function Page() {
     const res = await fetch('/api/claim', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ activity_id: selected.id, volunteer_name: name, planned_minutes: Number(planned) })
+      body: JSON.stringify({ activity_id: selected.id, volunteer_name: name, planned_minutes: Number(planned || 60) })
     });
     const json = await res.json();
     if (!res.ok) setMessage(json.error || 'Не удалось взять активность. Попробуй ещё раз.');
     else {
       setMessage('Активность взята. Теперь она видна всем ребятам.');
       setName('');
+      setPlanned('');
       await loadData();
     }
   }
@@ -112,7 +113,7 @@ export default function Page() {
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignment_id: submitAssignment, spent_minutes: Number(spent), material_url: materialUrl, volunteer_comment: comment })
+      body: JSON.stringify({ assignment_id: submitAssignment, spent_minutes: Number(spent || 0), material_url: materialUrl, volunteer_comment: comment })
     });
     const json = await res.json();
     if (!res.ok) setMessage(json.error || 'Не удалось сдать материал. Попробуй ещё раз.');
@@ -121,6 +122,7 @@ export default function Page() {
       setSubmitAssignment('');
       setMaterialUrl('');
       setComment('');
+      setSpent('');
       await loadData();
     }
   }
@@ -134,27 +136,59 @@ export default function Page() {
             <div>
               <div className="kicker">Добро.Медиа</div>
               <h1>Кабинет <span className="red">медиа-волонтёра</span></h1>
-              <p className="lead">Здесь ты выбираешь задание, снимаешь репортаж, пишешь пост или монтируешь короткое видео. Готовый материал отправляется на проверку Кустову Евгению Валерьевичу.</p>
+              <p className="lead">Информационный и рабочий сайт для ребят, которые хотят попробовать себя в фото, видео, интервью, текстах, монтаже и подготовке материалов о событиях Первых Кемского муниципального округа.</p>
+              <div className="actions"><a className="btn primary" href="#calendar">Выбрать задание</a><a className="btn ghost" href="#workflow">Как это устроено</a></div>
+              <div className="facts"><div className="fact"><span>Период участия</span><b>8–31 июля 2026</b></div><div className="fact"><span>Формат</span><b>Очно-дистанционный</b></div><div className="fact"><span>Где</span><b>Кемский муниципальный округ</b></div></div>
             </div>
             <div className="hero-panel">
-              <h3>Как всё работает</h3>
-              <ol>
-                <li>Открой календарь и выбери активность.</li>
-                <li>Прочитай подсказку и нажми «Взять активность».</li>
-                <li>Сними фото, видео, собери факты и комментарии.</li>
-                <li>Напиши пост или смонтируй ролик.</li>
-                <li>Сдай материал на проверку.</li>
-              </ol>
+              <h3>Главное правило</h3>
+              <p>Ребята самостоятельно снимают репортажи, пишут посты и монтируют короткие ролики. Готовые материалы отправляются Кустову Евгению Валерьевичу на проверку. Самостоятельно ничего не публикуем.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" id="about">
+          <div className="wrap">
+            <div className="head"><h2 className="title">Что такое <span className="red">Добро.Медиа</span></h2><p className="note">Это медиакоманда, которая помогает рассказывать о людях, событиях, добрых делах и летней жизни Движения Первых в Кемском округе.</p></div>
+            <div className="grid3">
+              <div className="card"><h3>Замечать важное</h3><p>Находить живые сюжеты: человек, событие, доброе дело, место, настроение, результат.</p></div>
+              <div className="card"><h3>Собирать материал</h3><p>Снимать фото и видео, брать короткие комментарии, уточнять факты, готовить черновики постов.</p></div>
+              <div className="card"><h3>Работать в команде</h3><p>Брать активности в календаре, видеть, кто что делает, и отправлять материалы на проверку.</p></div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" id="roles">
+          <div className="wrap">
+            <div className="head"><h2 className="title">Что можно <span className="red">делать</span></h2><p className="note">Можно выбрать одно направление или пробовать разные роли.</p></div>
+            <div className="grid3">
+              <div className="card"><h3>Фотограф</h3><p>Снимает общий план, действия, эмоции, детали и финальный кадр.</p></div>
+              <div className="card"><h3>Видеограф</h3><p>Снимает короткие фрагменты для клипа или репортажа.</p></div>
+              <div className="card"><h3>Интервьюер</h3><p>Задаёт 2–3 простых вопроса и фиксирует настоящие ответы участников.</p></div>
+              <div className="card"><h3>Автор поста</h3><p>Собирает факты и пишет понятный, живой и честный текст.</p></div>
+              <div className="card"><h3>Монтажёр</h3><p>Собирает короткий ролик: начало, процесс, эмоции, детали, финал.</p></div>
+              <div className="card"><h3>Редактор материалов</h3><p>Проверяет, всё ли подписано: дата, место, участники, ссылки, комментарии.</p></div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" id="workflow">
+          <div className="wrap">
+            <div className="head"><h2 className="title">Как <span className="red">работаем</span></h2><p className="note">Путь от выбора задания до проверки материала.</p></div>
+            <div className="steps">
+              <div className="step"><h3>Выбери активность</h3><p>Открой календарь, нажми на дату или задание и прочитай карточку-подсказку.</p></div>
+              <div className="step"><h3>Возьми в работу</h3><p>Укажи имя и планируемое время. Все увидят, что задание уже занято.</p></div>
+              <div className="step"><h3>Собери материал</h3><p>Сними фото, видео, возьми комментарий, уточни дату, место и участников.</p></div>
+              <div className="step"><h3>Подготовь черновик</h3><p>Напиши пост или собери короткий ролик. Не придумывай факты и цитаты.</p></div>
+              <div className="step"><h3>Сдай на проверку</h3><p>Прикрепи ссылку на материалы и напиши, что получилось и что нужно проверить.</p></div>
+              <div className="step"><h3>Доработай</h3><p>Если будет комментарий, исправь материал и отправь обновлённую версию.</p></div>
             </div>
           </div>
         </section>
 
         <section className="section" id="calendar">
           <div className="wrap">
-            <div className="head">
-              <h2 className="title">Календарь <span className="red">заданий</span></h2>
-              <p className="note">Нажми на активность внутри даты: откроется карточка с объяснением, заданием и подсказками.</p>
-            </div>
+            <div className="head"><h2 className="title">Календарь <span className="red">заданий</span></h2><p className="note">Нажми на активность внутри даты: откроется карточка с объяснением, заданием и подсказками.</p></div>
             <div className="calendar-help"><b>Активности начинаются с 8 июля.</b><span>В календаре видно, кто уже взял задание и на каком оно статусе.</span></div>
             <div className="calendar">
               <div className="cal-head"><div>Неделя</div>{weekDays.map(d => <div key={d}>{d}</div>)}</div>
@@ -183,22 +217,17 @@ export default function Page() {
 
         <section className="section" id="manual">
           <div className="wrap">
-            <div className="head">
-              <h2 className="title">Инструкция <span className="red">для ребят</span></h2>
-              <p className="note">Памятка для самостоятельной работы: что снять, как написать, как смонтировать и что отправить.</p>
-            </div>
+            <div className="head"><h2 className="title">Инструкция <span className="red">для ребят</span></h2><p className="note">Памятка для самостоятельной работы: что снять, как написать, как смонтировать и что отправить.</p></div>
             <div className="grid3">
               <div className="card"><h3>1. Разберись в событии</h3><p>Ответь на вопросы: что произошло, где, когда, кто участвовал, почему это важно и что хочется показать другим.</p></div>
               <div className="card"><h3>2. Сними историю</h3><p>Нужны общий план, участники в действии, эмоции, детали и финальный кадр. Хороший репортаж — это маленькая история.</p></div>
               <div className="card"><h3>3. Собери факты</h3><p>Запиши дату, место, участников, главное действие, результат, благодарности и реальные комментарии.</p></div>
-            </div>
-            <br />
+            </div><br />
             <div className="grid3">
               <div className="card"><h3>Фото</h3><p>Сними 10–15 кадров: место, действие, эмоции, детали, общий финальный кадр. Удали размытые и неудачные фото.</p></div>
               <div className="card"><h3>Видео</h3><p>Снимай короткими фрагментами по 5–10 секунд. Держи телефон устойчиво. Для клипов чаще подходит вертикальный формат.</p></div>
               <div className="card"><h3>Интервью</h3><p>Задай 2–3 простых вопроса: что запомнилось, почему это важно, какое настроение, что хочется пожелать другим.</p></div>
-            </div>
-            <br />
+            </div><br />
             <div className="grid3">
               <div className="card"><h3>Пост</h3><p>Структура: что произошло, где и когда, кто участвовал, что делали, почему это важно, живой момент, благодарность.</p></div>
               <div className="card"><h3>Монтаж</h3><p>Ролик лучше делать 20–40 секунд: сильный первый кадр, процесс, эмоции, детали и финал. Не перегружай эффектами.</p></div>
@@ -207,12 +236,19 @@ export default function Page() {
           </div>
         </section>
 
+        <section className="section" id="templates">
+          <div className="wrap">
+            <div className="head"><h2 className="title">Шаблоны <span className="red">сообщений</span></h2><p className="note">Можно копировать и заполнять под своё задание.</p></div>
+            <div className="grid2">
+              <div className="check"><h3>Черновик поста</h3><div className="template">Название события:\nКогда прошло:\nГде прошло:\nКто участвовал:\nЧто происходило:\nЧто было самым интересным:\nПочему это важно:\nРеальный комментарий участника:\nКого благодарим:\nКакие фото/видео прилагаются:</div></div>
+              <div className="check"><h3>Сообщение на проверку</h3><div className="template">Евгений Валерьевич, здравствуйте!\n\nОтправляю материал для проверки.\n\nСобытие:\nДата:\nМесто:\nКто участвовал:\n\nКратко о событии:\nЧерновик поста:\nСсылка на фото/видео:\nКомментарий участника:\nЧто нужно проверить:</div></div>
+            </div>
+          </div>
+        </section>
+
         <section className="section" id="rules">
           <div className="wrap">
-            <div className="head">
-              <h2 className="title">Правила <span className="red">медиа-волонтёра</span></h2>
-              <p className="note">Мы рассказываем о людях уважительно, честно и аккуратно.</p>
-            </div>
+            <div className="head"><h2 className="title">Правила <span className="red">медиа-волонтёра</span></h2><p className="note">Мы рассказываем о людях уважительно, честно и аккуратно.</p></div>
             <div className="grid3">
               <div className="card"><h3>Не публикуем сами</h3><p>Материалы сначала отправляются на проверку. Публикация возможна только после согласования.</p></div>
               <div className="card"><h3>Не придумываем</h3><p>Факты, имена и цитаты должны быть настоящими. Если не уверен — лучше уточнить.</p></div>
@@ -238,19 +274,16 @@ export default function Page() {
           </div>
           <div className="form">
             <h3>Взять активность</h3>
-            <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Твоё имя и фамилия" />
-            <input className="input" value={planned} onChange={e => setPlanned(e.target.value)} placeholder="Сколько минут планируешь" type="number" />
+            <label><b>Имя и фамилия</b><input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Например: Иванова Анна" /></label>
+            <label><b>Планируемое время, минут</b><input className="input" value={planned} onChange={e => setPlanned(e.target.value)} placeholder="Например: 60" type="number" /></label>
             <button className="btn primary" onClick={claimActivity}>Взять активность</button>
           </div>
           <div className="form">
             <h3>Сдать материал</h3>
-            <select value={submitAssignment} onChange={e => setSubmitAssignment(e.target.value)}>
-              <option value="">Выбери свою запись</option>
-              {selectedAssignments.map(a => <option key={a.id} value={a.id}>{a.volunteer_name} — {a.status}</option>)}
-            </select>
-            <input className="input" value={spent} onChange={e => setSpent(e.target.value)} placeholder="Сколько минут потратил(а)" type="number" />
-            <input className="input" value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="Ссылка на материалы, если есть" />
-            <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Комментарий: что сделал(а), что проверить" />
+            <label><b>Кто сдаёт</b><select value={submitAssignment} onChange={e => setSubmitAssignment(e.target.value)}><option value="">Выбери свою запись</option>{selectedAssignments.map(a => <option key={a.id} value={a.id}>{a.volunteer_name} — {a.status}</option>)}</select></label>
+            <label><b>Потраченное время, минут</b><input className="input" value={spent} onChange={e => setSpent(e.target.value)} placeholder="Например: 75" type="number" /></label>
+            <label><b>Ссылка на материалы</b><input className="input" value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="Ссылка на фото, видео или документ" /></label>
+            <label><b>Комментарий</b><textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Что сделал(а), что нужно проверить" /></label>
             <button className="btn primary" onClick={sendMaterial}>Сдать на проверку</button>
           </div>
           {message && <p><b>{message}</b></p>}
@@ -261,5 +294,5 @@ export default function Page() {
 }
 
 function Header() {
-  return <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · кабинет медиа-волонтёра</div></a><nav className="nav"><a href="#calendar">Календарь</a><a href="#manual">Инструкция</a><a href="#rules">Правила</a></nav></div></header>;
+  return <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · кабинет медиа-волонтёра</div></a><nav className="nav"><a href="#about">О проекте</a><a href="#roles">Роли</a><a href="#workflow">Как работаем</a><a href="#calendar">Календарь</a><a href="#templates">Шаблоны</a><a href="/admin">Администратор</a></nav></div></header>;
 }
