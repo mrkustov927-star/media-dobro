@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     const activity_id = String(body.activity_id || '');
     const volunteer_name = String(body.volunteer_name || '').trim();
     const planned_minutes = Number(body.planned_minutes || 60);
+    const topic_title = String(body.topic_title || '').trim();
 
     if (!activity_id || !volunteer_name) {
       return NextResponse.json({ error: 'Укажите активность и имя волонтёра' }, { status: 400 });
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
         activity_id,
         volunteer_name,
         planned_minutes,
+        volunteer_comment: topic_title ? `Тема: ${topic_title}` : null,
         status: 'Взято в работу'
       })
       .select()
