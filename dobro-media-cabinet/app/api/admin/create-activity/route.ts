@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { requireAdminPin, supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getSupabaseAdmin, requireAdminPin } from '@/lib/supabaseAdmin';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
@@ -13,6 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Укажите дату и название активности' }, { status: 400 });
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from('activities')
       .insert({
