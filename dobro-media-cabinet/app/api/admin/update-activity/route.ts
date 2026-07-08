@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { requireAdminPin, supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getSupabaseAdmin, requireAdminPin } from '@/lib/supabaseAdmin';
+
+export const dynamic = 'force-dynamic';
 
 const allowedFields = new Set([
   'title',
@@ -30,6 +32,7 @@ export async function POST(request: Request) {
     const payload: Record<string, unknown> = {};
     payload[field] = body.value;
 
+    const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from('activities')
       .update(payload)
