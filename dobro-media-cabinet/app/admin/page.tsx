@@ -144,12 +144,13 @@ export default function AdminPage() {
   async function updateAssignment(id: string, field: string, value: unknown) {
     const current = assignments.find(a => a.id === id);
     if (!current) return;
+    const rawSpentHours = String(value || '').trim();
     setMessage('');
     const payload = {
       pin,
       id,
       status: field === 'status' ? value : current.status,
-      spent_minutes: field === 'spent_hours' ? hoursToMinutes(String(value || ''), 1) : current.spent_minutes,
+      spent_minutes: field === 'spent_hours' ? (rawSpentHours ? hoursToMinutes(rawSpentHours, 1) : '') : current.spent_minutes,
       admin_comment: field === 'admin_comment' ? value : current.admin_comment
     };
     const res = await fetch('/api/admin/update-assignment', {
