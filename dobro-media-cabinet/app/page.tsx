@@ -147,12 +147,24 @@ export default function Page() {
       setMessage('Сначала выбери свою запись в списке.');
       return;
     }
+
+    const spentHours = Number(String(spent || '').replace(',', '.'));
+    if (!Number.isFinite(spentHours) || spentHours <= 0) {
+      setMessage('Укажи потраченное время в часах, например: 1 или 1,5.');
+      return;
+    }
+
+    if (!materialUrl.trim()) {
+      setMessage('Добавь ссылку на материалы: фото, видео или документ.');
+      return;
+    }
+
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         assignment_id: submitAssignment,
-        spent_minutes: hoursToMinutes(spent, 1),
+        spent_minutes: Math.round(spentHours * 60),
         material_url: materialUrl,
         volunteer_comment: comment
       })
@@ -268,7 +280,7 @@ export default function Page() {
             <div className="grid3">
               <div className="card"><h3>Как писать</h3><p>Пиши просто, доброжелательно и по делу. Покажи пользу, участие ребят, команду, действие и результат.</p></div>
               <div className="card"><h3>Проверь факты</h3><p>Дата, место, имена, название события и цифры должны быть точными. Если сомневаешься — напиши куратору, что нужно уточнить.</p></div>
-              <div className="card"><h3>Снимай уважительно</h3><p>Не выбирай неудачные кадры людей, не снимай личные данные и не мешай событию. Портреты лучше делать с разрешения.</p></div>
+              <div className="card"><h3>Снимай уважительно</h3><p>Перед съёмкой людей спроси разрешение, особенно для крупного портрета. Не выбирай неудачные кадры, не снимай личные данные и не мешай событию.</p></div>
             </div><br />
             <div className="grid2">
               <div className="check"><h3>Шаблон поста</h3><div className="template">Заголовок:{'\n'}Что произошло:{'\n'}Когда и где:{'\n'}Кто участвовал:{'\n'}Что делали:{'\n'}Почему это важно:{'\n'}Живой момент или цитата:{'\n'}Кого благодарим:{'\n'}Какие фото/видео есть:</div></div>
@@ -323,8 +335,8 @@ export default function Page() {
             <label><b>Кто сдаёт</b><select value={submitAssignment} onChange={e => setSubmitAssignment(e.target.value)}><option value="">Выбери свою запись</option>{selectedAssignments.map(a => <option key={a.id} value={a.id}>{assignmentLabel(a)} — {a.status}</option>)}</select></label>
             {selectedAdminComment ? <div className="revision-note"><b>{selectedSubmitAssignment?.status === 'На доработке' ? 'Нужно доработать' : 'Комментарий администратора'}</b><p>{selectedAdminComment}</p></div> : null}
             <label><b>Потраченное время, часы</b><input className="input" value={spent} onChange={e => setSpent(e.target.value)} placeholder="Например: 1,5" type="number" step="0.5" /></label>
-            <label><b>Ссылка на материалы</b><input className="input" value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="Ссылка на фото, видео или документ" /></label>
-            <label><b>Комментарий</b><textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Что сделал(а), что нужно проверить" /></label>
+            <label><b>Ссылка на материалы</b><input className="input" value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="Обязательно: ссылка на фото, видео или документ" /></label>
+            <label><b>Комментарий</b><textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Что сделал(а), что приложено, что нужно проверить" /></label>
             <button className="btn primary" onClick={sendMaterial}>Сдать на проверку</button>
           </div>
           {message && <p><b>{message}</b></p>}
