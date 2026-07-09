@@ -24,8 +24,16 @@ export async function POST(request: Request) {
     const material_url = String(body.material_url || '').trim();
     const volunteer_comment = String(body.volunteer_comment || '').trim();
 
-    if (!assignment_id || !spent_minutes) {
-      return NextResponse.json({ error: 'Укажите задание и потраченное время' }, { status: 400 });
+    if (!assignment_id) {
+      return NextResponse.json({ error: 'Сначала выберите свою запись' }, { status: 400 });
+    }
+
+    if (!Number.isFinite(spent_minutes) || spent_minutes <= 0) {
+      return NextResponse.json({ error: 'Укажите потраченное время в часах' }, { status: 400 });
+    }
+
+    if (!material_url) {
+      return NextResponse.json({ error: 'Добавьте ссылку на материалы' }, { status: 400 });
     }
 
     const supabaseAdmin = getSupabaseAdmin();
@@ -72,7 +80,7 @@ export async function POST(request: Request) {
       topicTitle ? `Тема: ${topicTitle}` : null,
       `Активность: ${activityTitle}`,
       `Потраченное время: ${minutesToHoursText(spent_minutes)}`,
-      material_url ? 'Ссылка на материалы указана в админке.' : 'Ссылка на материалы не указана.',
+      'Ссылка на материалы указана в админке.',
       volunteer_comment ? `Комментарий: ${volunteer_comment}` : 'Комментарий не указан.',
       '',
       'Материал ждёт проверки в админке.'
