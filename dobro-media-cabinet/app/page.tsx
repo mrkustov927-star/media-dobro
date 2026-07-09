@@ -290,9 +290,20 @@ export default function Page() {
 
         <section className="section" id="templates">
           <div className="wrap">
-            <div className="head"><h2 className="title">Шаблон <span className="red">черновика</span></h2><p className="note">Можно использовать как памятку при подготовке текста перед сдачей материала в календаре.</p></div>
-            <div className="grid2 template-single">
-              <div className="check"><h3>Черновик поста</h3><div className="template">Название события:{'\n'}Когда прошло:{'\n'}Где прошло:{'\n'}Кто участвовал:{'\n'}Что происходило:{'\n'}Что было самым интересным:{'\n'}Почему это важно:{'\n'}Реальный комментарий участника:{'\n'}Кого благодарим:{'\n'}Какие фото/видео прилагаются:</div></div>
+            <div className="head"><h2 className="title">Шпаргалки <span className="red">для материалов</span></h2><p className="note">Короткие подсказки, чтобы материалы были честными, аккуратными и готовыми к проверке куратором.</p></div>
+            <div className="grid3">
+              <div className="card"><h3>Проверь факты</h3><p>Дата, место, имена, название события и цифры должны быть точными. Если сомневаешься — напиши куратору, что нужно уточнить.</p></div>
+              <div className="card"><h3>Снимай уважительно</h3><p>Не выбирай неудачные кадры людей, не снимай личные данные и не мешай событию. Портреты лучше делать с разрешения.</p></div>
+              <div className="card"><h3>Держи фирменный тон</h3><p>Пиши просто, доброжелательно и по делу: показываем пользу, участие ребят, команду, действие и результат.</p></div>
+            </div><br />
+            <div className="grid3">
+              <div className="card"><h3>Фото: минимум</h3><p>Общий план, участники в действии, эмоции, детали, финальный кадр. Лучше 10 хороших фото, чем 40 случайных.</p></div>
+              <div className="card"><h3>Видео: минимум</h3><p>Короткие фрагменты по 5–10 секунд: начало, процесс, эмоции, детали, финал. Следи за светом, звуком и устойчивостью телефона.</p></div>
+              <div className="card"><h3>Интервью: вопросы</h3><p>Что произошло? Что запомнилось? Почему это важно? Что хочется пожелать другим ребятам?</p></div>
+            </div><br />
+            <div className="grid2">
+              <div className="check"><h3>Шаблон поста</h3><div className="template">Заголовок:{'\n'}Что произошло:{'\n'}Когда и где:{'\n'}Кто участвовал:{'\n'}Что делали:{'\n'}Почему это важно:{'\n'}Живой момент или цитата:{'\n'}Кого благодарим:{'\n'}Какие фото/видео есть:</div></div>
+              <div className="check"><h3>Перед отправкой</h3><ul className="tick-list"><li>Файлы открываются по ссылке.</li><li>Фото и видео подписаны понятно.</li><li>Тема и имя автора указаны.</li><li>Черновик текста приложен или написан в комментарии.</li><li>Вопросы к куратору написаны отдельно.</li></ul></div>
             </div>
           </div>
         </section>
@@ -361,5 +372,5 @@ export default function Page() {
 }
 
 function Header() {
-  return <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · кабинет медиа-волонтёра</div></a><nav className="nav"><a href="#about">О проекте</a><a href="#roles">Роли</a><a href="#workflow">Как работаем</a><a href="#calendar">Календарь</a><a href="#materials">Что собрать</a><a href="#templates">Шаблоны</a><a href="/admin">Администратор</a></nav></div></header>;
+  return <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · кабинет медиа-волонтёра</div></a><nav className="nav"><a href="#about">О проекте</a><a href="#roles">Роли</a><a href="#workflow">Как работаем</a><a href="#calendar">Календарь</a><a href="#materials">Что собрать</a><a href="#templates">Шпаргалки</a><a href="/admin">Администратор</a></nav></div></header>;
 }
