@@ -77,11 +77,12 @@ export async function sendVkAdminMessage(text: string) {
   }
 
   try {
+    const randomId = Math.floor(Math.random() * 2147483647);
     const params = new URLSearchParams({
       access_token: token,
       v: version,
       peer_id: peerId,
-      random_id: String(Date.now()),
+      random_id: String(randomId),
       message: text
     });
 
