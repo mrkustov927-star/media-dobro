@@ -1,6 +1,8 @@
 name: Build image for Cloud.ru
 
 on:
+  push:
+    branches: ["cloudru-migration"]
   workflow_dispatch:
 
 permissions:
@@ -8,25 +10,43 @@ permissions:
 
 env:
   IMAGE_NAME: dobro-media
+  CLOUDRU_REGISTRY: ${{ secrets.CLOUDRU_REGISTRY }}
+  CLOUDRU_REGISTRY_USERNAME: ${{ secrets.CLOUDRU_REGISTRY_USERNAME }}
+  CLOUDRU_REGISTRY_PASSWORD: ${{ secrets.CLOUDRU_REGISTRY_PASSWORD }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Check Cloud.ru configuration
+        id: cloudru
+        shell: bash
+        run: |
+          if [ -n "$CLOUDRU_REGISTRY" ] && [ -n "$CLOUDRU_REGISTRY_USERNAME" ] && [ -n "$CLOUDRU_REGISTRY_PASSWORD" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Cloud.ru secrets are not configured yet. Image build is skipped."
+          fi
+
       - name: Checkout migration branch
+        if: steps.cloudru.outputs.ready == 'true'
         uses: actions/checkout@v4
 
       - name: Sign in to Cloud.ru Artifact Registry
+        if: steps.cloudru.outputs.ready == 'true'
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.CLOUDRU_REGISTRY }}
-          username: ${{ secrets.CLOUDRU_REGISTRY_USERNAME }}
-          password: ${{ secrets.CLOUDRU_REGISTRY_PASSWORD }}
+          registry: ${{ env.CLOUDRU_REGISTRY }}
+          username: ${{ env.CLOUDRU_REGISTRY_USERNAME }}
+          password: ${{ env.CLOUDRU_REGISTRY_PASSWORD }}
 
       - name: Set up Docker Buildx
+        if: steps.cloudru.outputs.ready == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push linux/amd64 image
+        if: steps.cloudru.outputs.ready == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -34,5 +54,5 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ secrets.CLOUDRU_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ secrets.CLOUDRU_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.CLOUDRU_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.CLOUDRU_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
