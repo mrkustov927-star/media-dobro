@@ -1,0 +1,1 @@
+Cloud.ru image build requested after registry credentials were configured.
