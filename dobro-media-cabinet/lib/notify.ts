@@ -67,9 +67,48 @@ async function notifyByEmail(text: string) {
   }
 }
 
+export async function sendVkAdminMessage(text: string) {
+  const token = process.env.VK_GROUP_TOKEN?.trim();
+  const peerId = process.env.VK_ADMIN_PEER_ID?.trim();
+  const version = process.env.VK_API_VERSION?.trim() || '5.199';
+
+  if (!token || !peerId) {
+    return { sent: false, error: 'Не заданы VK_GROUP_TOKEN и VK_ADMIN_PEER_ID' };
+  }
+
+  try {
+    const params = new URLSearchParams({
+      access_token: token,
+      v: version,
+      peer_id: peerId,
+      random_id: String(Date.now()),
+      message: text
+    });
+
+    const response = await fetch('https://api.vk.com/method/messages.send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result || result.error) {
+      const details = result?.error?.error_msg || `HTTP ${response.status}`;
+      console.error('VK notification failed:', details, result?.error || '');
+      return { sent: false, error: details };
+    }
+
+    return { sent: true };
+  } catch (error: any) {
+    console.error('VK notification failed:', error);
+    return { sent: false, error: error?.message || 'Неизвестная ошибка VK' };
+  }
+}
+
 export async function notifyAdmin(text: string) {
   await Promise.allSettled([
     notifyByTelegram(text),
-    notifyByEmail(text)
+    notifyByEmail(text),
+    sendVkAdminMessage(text)
   ]);
 }
