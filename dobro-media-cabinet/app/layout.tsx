@@ -2,6 +2,7 @@ import './globals.css';
 import './extra.css';
 import './vk.css';
 import './calendar-status.css';
+import './calendar.css';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
