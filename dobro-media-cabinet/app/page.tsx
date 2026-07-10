@@ -14,6 +14,8 @@ const weeks = [
   ['27–31 июля', [27, 28, 29, 30, 31, null, null]]
 ] as const;
 
+type CalendarActivityState = 'free' | 'active' | 'complete';
+
 function fallbackActivities(): Activity[] {
   return initialActivities.map((item, index) => ({
     id: `start-${item.day}-${index}`,
@@ -54,6 +56,25 @@ function getAssignmentTopic(assignment: Assignment) {
 function assignmentLabel(assignment: Assignment) {
   const topic = getAssignmentTopic(assignment);
   return topic ? `${assignment.volunteer_name} — ${topic}` : assignment.volunteer_name;
+}
+
+function getCalendarActivityState(currentAssignments: Assignment[]): CalendarActivityState {
+  if (!currentAssignments.length) return 'free';
+  return currentAssignments.every(assignment => assignment.status === 'Зачтено') ? 'complete' : 'active';
+}
+
+function getCalendarStateLabel(state: CalendarActivityState, count: number) {
+  if (state === 'free') return 'Свободно';
+  if (state === 'complete') return 'Завершено';
+  return count > 1 ? `В работе · ${count}` : 'В работе';
+}
+
+function getCalendarAssignmentSummary(currentAssignments: Assignment[], state: CalendarActivityState) {
+  if (!currentAssignments.length) return 'Можно взять это задание';
+  const labels = currentAssignments.map(assignmentLabel);
+  const visible = labels.slice(0, 2).join(', ');
+  const rest = labels.length > 2 ? ` и ещё ${labels.length - 2}` : '';
+  return `${state === 'complete' ? 'Завершили' : 'Занимаются'}: ${visible}${rest}`;
 }
 
 export default function Page() {
@@ -99,7 +120,9 @@ export default function Page() {
     return map;
   }, [activities]);
 
-  const selectedAssignments = selected ? assignments.filter(a => a.activity_id === selected.id) : [];
+  const selectedAssignments = selected
+    ? assignments.filter(a => a.activity_id === selected.id && a.status !== 'Отменено')
+    : [];
   const selectedSubmitAssignment = selectedAssignments.find(a => a.id === submitAssignment);
   const selectedAdminComment = selectedSubmitAssignment?.admin_comment?.trim();
   const selectedIsOwnTopic = selected?.type === 'd';
@@ -243,7 +266,14 @@ export default function Page() {
         <section className="section" id="calendar">
           <div className="wrap">
             <div className="head"><h2 className="title">Календарь <span className="red">заданий</span></h2><p className="note">Нажми на активность внутри даты: откроется карточка с объяснением, заданием и подсказками.</p></div>
-            <div className="calendar-help"><b>Активности начинаются с 8 июля.</b><span>В календаре видно, кто уже взял задание, какую тему выбрал и на каком оно статусе.</span></div>
+            <div className="calendar-help">
+              <div className="calendar-help-copy"><b>Активности начинаются с 8 июля.</b><span>Занятые задания выделяются автоматически, как только кто-то берёт их в работу.</span></div>
+              <div className="calendar-legend" aria-label="Обозначения календаря">
+                <span><i className="legend-dot free"/>Свободно</span>
+                <span><i className="legend-dot active"/>В работе</span>
+                <span><i className="legend-dot complete"/>Завершено</span>
+              </div>
+            </div>
             <div className="calendar">
               <div className="cal-head"><div>Неделя</div>{weekDays.map(d => <div key={d}>{d}</div>)}</div>
               {weeks.map(([label, days]) => (
@@ -254,11 +284,19 @@ export default function Page() {
                     return <div className={day && day >= 8 ? 'day' : 'day muted'} key={idx}>
                       {day && <span className="num">{day}</span>}
                       {list.map(item => {
-                        const taken = assignments.filter(a => a.activity_id === item.id);
-                        return <button className="activity-pill" key={item.id} onClick={() => { setSelected(item); setTopicTitle(''); setMessage(''); }}>
-                          <span className={`tag ${item.type}`}>{item.tag}</span>
+                        const currentAssignments = assignments.filter(a => a.activity_id === item.id && a.status !== 'Отменено');
+                        const activityState = getCalendarActivityState(currentAssignments);
+                        const stateLabel = getCalendarStateLabel(activityState, currentAssignments.length);
+                        const assignmentSummary = getCalendarAssignmentSummary(currentAssignments, activityState);
+                        return <button
+                          className={`activity-pill activity-pill-${activityState}`}
+                          key={item.id}
+                          onClick={() => { setSelected(item); setTopicTitle(''); setMessage(''); }}
+                          aria-label={`${item.title}. ${stateLabel}. ${assignmentSummary}`}
+                        >
+                          <span className="activity-pill-top"><span className={`tag ${item.type}`}>{item.tag}</span><span className={`calendar-state calendar-state-${activityState}`}>{stateLabel}</span></span>
                           <b>{item.title}</b>
-                          <span>{taken.length ? `Взяли: ${taken.map(assignmentLabel).join(', ')}` : 'Свободно'}</span>
+                          <span className="activity-meta">{assignmentSummary}</span>
                         </button>;
                       })}
                     </div>;
