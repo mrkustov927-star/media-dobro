@@ -11,6 +11,9 @@ const activityTypes = [
   ['d', 'Своя тема']
 ] as const;
 
+const vkCommunityUrl = process.env.NEXT_PUBLIC_VK_COMMUNITY_URL || '';
+const vkMessagesUrl = process.env.NEXT_PUBLIC_VK_MESSAGES_URL || '';
+
 function hoursToMinutes(value: string, fallbackHours = 1) {
   const normalized = String(value || '').replace(',', '.');
   const hours = Number(normalized);
@@ -36,6 +39,18 @@ function getAssignmentComment(assignment: Assignment) {
     .filter(Boolean);
   const withoutTopic = lines.filter((line, index) => !(index === 0 && line.startsWith('Тема:')));
   return withoutTopic.join('\n').replace(/^Комментарий:\s*/, '').trim();
+}
+
+function buildVkDraft(activity: Activity | undefined, topic: string, volunteerComment: string) {
+  return [
+    activity?.title || 'Событие Первых',
+    '',
+    activity ? `${activity.day} июля 2026 года` : null,
+    topic ? `Тема: ${topic}` : null,
+    volunteerComment || null,
+    '',
+    '#ДвижениеПервых10 #ПервыеКемь #КемскийОкруг'
+  ].filter(Boolean).join('\n');
 }
 
 export default function AdminPage() {
@@ -89,6 +104,49 @@ export default function AdminPage() {
     } else {
       setPinStatus('bad');
       setMessage('Пароль не принят. Проверьте введённое значение.');
+    }
+  }
+
+  async function testVkNotification() {
+    setMessage('');
+    const res = await fetch('/api/admin/vk-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setPinStatus('bad');
+      setMessage(json.error || 'Тестовое сообщение ВКонтакте не отправлено.');
+    } else {
+      setPinStatus('ok');
+      setMessage('Тестовое сообщение отправлено ВКонтакте.');
+    }
+  }
+
+  async function sendAssignmentToVk(id: string) {
+    setMessage('');
+    const res = await fetch('/api/admin/vk-send-assignment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, id })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setPinStatus('bad');
+      setMessage(json.error || 'Не удалось отправить заявку ВКонтакте.');
+    } else {
+      setPinStatus('ok');
+      setMessage('Заявка отправлена вам ВКонтакте.');
+    }
+  }
+
+  async function copyVkDraft(activity: Activity | undefined, topic: string, volunteerComment: string) {
+    try {
+      await navigator.clipboard.writeText(buildVkDraft(activity, topic, volunteerComment));
+      setMessage('Черновик публикации ВКонтакте скопирован.');
+    } catch {
+      setMessage('Не удалось скопировать черновик. Разрешите браузеру доступ к буферу обмена.');
     }
   }
 
@@ -229,17 +287,74 @@ export default function AdminPage() {
   }
 
   return <>
-    <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · администратор</div></a><nav className="nav"><a href="/">Кабинет ребят</a></nav></div></header>
+    <header className="top">
+      <div className="wrap topin">
+        <a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · администратор</div></a>
+        <nav className="nav"><a href="/">Кабинет ребят</a><a href="#vk-tools">ВКонтакте</a></nav>
+      </div>
+    </header>
     <main>
-      <section className="hero"><div className="wrap hero-card"><div><div className="kicker">Админ-панель</div><h1>Живой учёт <span className="red">активностей</span></h1><p className="lead">Здесь можно назначать задания ребятам, удалять ошибочные назначения, менять статусы, время в часах, комментарии и корректировать календарь.</p></div><div className="hero-panel"><h3>Доступ администратора</h3><div className="form"><input className="input" type="password" value={pin} onChange={e => { setPin(e.target.value); setPinStatus('idle'); }} placeholder="Введите пароль"/><button className="btn primary" onClick={checkPin}>Проверить пароль</button></div><p>{pinStatus === 'ok' ? 'Пароль принят.' : pinStatus === 'bad' ? 'Пароль не принят.' : 'Введите пароль администратора.'}</p></div></div></section>
+      <section className="hero">
+        <div className="wrap hero-card">
+          <div><div className="kicker">Админ-панель</div><h1>Живой учёт <span className="red">активностей</span></h1><p className="lead">Здесь можно назначать задания ребятам, удалять ошибочные назначения, менять статусы, время в часах, комментарии и корректировать календарь.</p></div>
+          <div className="hero-panel"><h3>Доступ администратора</h3><div className="form"><input className="input" type="password" value={pin} onChange={e => { setPin(e.target.value); setPinStatus('idle'); }} placeholder="Введите пароль"/><button className="btn primary" onClick={checkPin}>Проверить пароль</button></div><p>{pinStatus === 'ok' ? 'Пароль принят.' : pinStatus === 'bad' ? 'Пароль не принят.' : 'Введите пароль администратора.'}</p></div>
+        </div>
+      </section>
 
       <section className="section"><div className="wrap">{message && <div className="card"><p><b>{message}</b></p></div>}</div></section>
 
-      <section className="section"><div className="wrap"><div className="head"><h2 className="title">Назначить <span className="red">активность</span></h2><p className="note">Выберите готовое задание из календаря и назначьте его конкретному волонтёру.</p></div><div className="card"><div className="form"><select value={assignActivityId} onChange={e => setAssignActivityId(e.target.value)}><option value="">Выберите активность</option>{activities.map(a => <option key={a.id} value={a.id}>{a.day} июля — {a.title}</option>)}</select><input className="input" value={assignName} onChange={e => setAssignName(e.target.value)} placeholder="ФИО волонтёра"/><input className="input" value={assignTopic} onChange={e => setAssignTopic(e.target.value)} placeholder="Название темы, если это своя тема"/><input className="input" type="number" step="0.5" value={assignHours} onChange={e => setAssignHours(e.target.value)} placeholder="Планируемое время, часы"/><button className="btn primary" onClick={createAssignment}>Назначить</button></div></div></div></section>
+      <section className="section" id="vk-tools">
+        <div className="wrap">
+          <div className="head"><h2 className="title">Управление <span className="red">ВКонтакте</span></h2><p className="note">Проверка уведомлений, быстрый переход в сообщество и ручная отправка заявок себе в сообщения.</p></div>
+          <div className="card">
+            <h3>Связь с сообществом</h3>
+            <p>После настройки токена уведомления о взятии активности и сдаче материала будут приходить вам во ВКонтакте автоматически.</p>
+            <div className="actions vk-actions">
+              <button className="btn primary" onClick={testVkNotification}>Отправить тест в VK</button>
+              {vkMessagesUrl ? <a className="btn ghost" href={vkMessagesUrl} target="_blank" rel="noreferrer">Открыть сообщения</a> : null}
+              {vkCommunityUrl ? <a className="btn ghost" href={vkCommunityUrl} target="_blank" rel="noreferrer">Открыть сообщество</a> : null}
+            </div>
+            {!vkCommunityUrl && !vkMessagesUrl ? <p className="note">Ссылки появятся после добавления NEXT_PUBLIC_VK_COMMUNITY_URL и NEXT_PUBLIC_VK_MESSAGES_URL в Vercel.</p> : null}
+          </div>
+        </div>
+      </section>
 
-      <section className="section"><div className="wrap"><div className="head"><h2 className="title">Заявки <span className="red">волонтёров</span></h2><p className="note">Меняйте статус, затраченное время в часах, комментарий или удаляйте ошибочные назначения.</p></div>{assignments.length === 0 ? <div className="card"><h3>Заявок пока нет</h3><p>Когда ребята возьмут активности или вы назначите задание, записи появятся здесь.</p></div> : <div className="admin-card-list">{assignments.map(a => { const activity = activityById.get(a.activity_id); const topic = getAssignmentTopic(a); const volunteerComment = getAssignmentComment(a); return <article className="admin-edit-card" key={a.id}><div className="admin-edit-head"><div><div className="admin-date">{activity ? `${activity.day} июля` : '—'}</div><h3>{activity?.title || 'Активность'}</h3></div><button className="btn danger" onClick={() => deleteAssignment(a.id, a.volunteer_name)}>Удалить</button></div><div className="admin-fields assignment-fields"><label><span>Волонтёр</span><b>{a.volunteer_name}</b>{topic ? <small className="admin-topic">Тема: {topic}</small> : null}<small>План: {minutesToHours(a.planned_minutes) || '—'} ч.</small></label><label><span>Статус</span><select value={a.status} onChange={e => updateAssignment(a.id, 'status', e.target.value)}>{statuses.map(s => <option key={s} value={s}>{s}</option>)}</select></label><label><span>Факт, часы</span><input className="input" type="number" step="0.5" defaultValue={minutesToHours(a.spent_minutes)} placeholder="Например: 1,5" onBlur={e => updateAssignment(a.id, 'spent_hours', e.target.value)}/></label><label><span>Материал</span>{a.material_link ? <a className="admin-link" href={a.material_link} target="_blank">Открыть материал</a> : <b>—</b>}{volunteerComment ? <small>{volunteerComment}</small> : null}</label><label className="wide"><span>Комментарий администратора</span><textarea defaultValue={a.admin_comment || ''} onBlur={e => updateAssignment(a.id, 'admin_comment', e.target.value)} placeholder="Комментарий для ребят"/></label></div></article>; })}</div>}</div></section>
+      <section className="section">
+        <div className="wrap">
+          <div className="head"><h2 className="title">Назначить <span className="red">активность</span></h2><p className="note">Выберите готовое задание из календаря и назначьте его конкретному волонтёру.</p></div>
+          <div className="card"><div className="form"><select value={assignActivityId} onChange={e => setAssignActivityId(e.target.value)}><option value="">Выберите активность</option>{activities.map(a => <option key={a.id} value={a.id}>{a.day} июля — {a.title}</option>)}</select><input className="input" value={assignName} onChange={e => setAssignName(e.target.value)} placeholder="ФИО волонтёра"/><input className="input" value={assignTopic} onChange={e => setAssignTopic(e.target.value)} placeholder="Название темы, если это своя тема"/><input className="input" type="number" step="0.5" value={assignHours} onChange={e => setAssignHours(e.target.value)} placeholder="Планируемое время, часы"/><button className="btn primary" onClick={createAssignment}>Назначить</button></div></div>
+        </div>
+      </section>
 
-      <section className="section"><div className="wrap"><div className="head"><h2 className="title">Редактировать <span className="red">календарь</span></h2><p className="note">Календарь уже заполнен заданиями. Здесь можно точечно менять формулировки, добавлять новые активности и скрывать лишние.</p></div><div className="card"><h3>Добавить активность</h3><div className="form"><input className="input" value={newDay} onChange={e => setNewDay(e.target.value)} placeholder="Дата июля, например 22 или 22.07"/><input className="input" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Название активности"/><button className="btn primary" onClick={createActivity}>Добавить</button></div></div><br/>{activities.length === 0 ? <div className="card"><h3>Календарь пока пуст</h3><p>Нажмите кнопку, чтобы добавить стартовые задания на июль.</p><button className="btn primary" onClick={seedCalendar}>Заполнить календарь на июль</button></div> : <div className="admin-card-list calendar-edit-list">{activities.map(a => <article className="admin-edit-card calendar-edit-card" key={a.id}><div className="admin-edit-head"><div><div className="admin-date">{a.day} июля</div><label><span>Название активности</span><input className="input" defaultValue={a.title} onBlur={e => updateActivity(a.id, 'title', e.target.value)}/></label></div><label className="switch-line"><input type="checkbox" defaultChecked={a.is_active} onChange={e => updateActivity(a.id, 'is_active', e.target.checked)}/> Показывать ребятам</label></div><div className="admin-fields calendar-fields"><label><span>Метка</span><input className="input" defaultValue={a.tag} onBlur={e => updateActivity(a.id, 'tag', e.target.value)}/></label><label><span>Вид</span><select defaultValue={a.type} onChange={e => updateActivity(a.id, 'type', e.target.value)}>{activityTypes.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span>Плановое время, часы</span><input className="input" type="number" step="0.5" defaultValue={minutesToHours(a.estimated_minutes)} onBlur={e => updateActivity(a.id, 'estimated_minutes', hoursToMinutes(e.target.value, 1))} placeholder="ч."/></label><label className="wide"><span>О чём это</span><textarea defaultValue={a.description} onBlur={e => updateActivity(a.id, 'description', e.target.value)} /></label><label className="wide"><span>Твоё задание</span><textarea defaultValue={a.task} onBlur={e => updateActivity(a.id, 'task', e.target.value)} /></label><label className="wide"><span>Как делать</span><textarea defaultValue={a.how_to} onBlur={e => updateActivity(a.id, 'how_to', e.target.value)} /></label><label className="wide"><span>Что собрать</span><textarea defaultValue={a.collect} onBlur={e => updateActivity(a.id, 'collect', e.target.value)} /></label><label className="wide"><span>Что отправить</span><textarea defaultValue={a.send_to_admin} onBlur={e => updateActivity(a.id, 'send_to_admin', e.target.value)} /></label></div></article>)}</div>}</div></section>
+      <section className="section">
+        <div className="wrap">
+          <div className="head"><h2 className="title">Заявки <span className="red">волонтёров</span></h2><p className="note">Меняйте статус, затраченное время в часах, комментарий или удаляйте ошибочные назначения.</p></div>
+          {assignments.length === 0 ? <div className="card"><h3>Заявок пока нет</h3><p>Когда ребята возьмут активности или вы назначите задание, записи появятся здесь.</p></div> : <div className="admin-card-list">{assignments.map(a => {
+            const activity = activityById.get(a.activity_id);
+            const topic = getAssignmentTopic(a);
+            const volunteerComment = getAssignmentComment(a);
+            return <article className="admin-edit-card" key={a.id}>
+              <div className="admin-edit-head"><div><div className="admin-date">{activity ? `${activity.day} июля` : '—'}</div><h3>{activity?.title || 'Активность'}</h3></div><button className="btn danger" onClick={() => deleteAssignment(a.id, a.volunteer_name)}>Удалить</button></div>
+              <div className="admin-fields assignment-fields">
+                <label><span>Волонтёр</span><b>{a.volunteer_name}</b>{topic ? <small className="admin-topic">Тема: {topic}</small> : null}<small>План: {minutesToHours(a.planned_minutes) || '—'} ч.</small></label>
+                <label><span>Статус</span><select value={a.status} onChange={e => updateAssignment(a.id, 'status', e.target.value)}>{statuses.map(s => <option key={s} value={s}>{s}</option>)}</select></label>
+                <label><span>Факт, часы</span><input className="input" type="number" step="0.5" defaultValue={minutesToHours(a.spent_minutes)} placeholder="Например: 1,5" onBlur={e => updateAssignment(a.id, 'spent_hours', e.target.value)}/></label>
+                <label><span>Материал</span>{a.material_link ? <a className="admin-link" href={a.material_link} target="_blank" rel="noreferrer">Открыть материал</a> : <b>—</b>}{volunteerComment ? <small>{volunteerComment}</small> : null}</label>
+                <label className="wide"><span>Комментарий администратора</span><textarea defaultValue={a.admin_comment || ''} onBlur={e => updateAssignment(a.id, 'admin_comment', e.target.value)} placeholder="Комментарий для ребят"/></label>
+              </div>
+              <div className="actions admin-vk-actions"><button className="btn ghost" onClick={() => sendAssignmentToVk(a.id)}>Отправить себе в VK</button><button className="btn ghost" onClick={() => copyVkDraft(activity, topic, volunteerComment)}>Скопировать черновик для VK</button></div>
+            </article>;
+          })}</div>}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="wrap">
+          <div className="head"><h2 className="title">Редактировать <span className="red">календарь</span></h2><p className="note">Календарь уже заполнен заданиями. Здесь можно точечно менять формулировки, добавлять новые активности и скрывать лишние.</p></div>
+          <div className="card"><h3>Добавить активность</h3><div className="form"><input className="input" value={newDay} onChange={e => setNewDay(e.target.value)} placeholder="Дата июля, например 22 или 22.07"/><input className="input" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Название активности"/><button className="btn primary" onClick={createActivity}>Добавить</button></div></div><br/>
+          {activities.length === 0 ? <div className="card"><h3>Календарь пока пуст</h3><p>Нажмите кнопку, чтобы добавить стартовые задания на июль.</p><button className="btn primary" onClick={seedCalendar}>Заполнить календарь на июль</button></div> : <div className="admin-card-list calendar-edit-list">{activities.map(a => <article className="admin-edit-card calendar-edit-card" key={a.id}><div className="admin-edit-head"><div><div className="admin-date">{a.day} июля</div><label><span>Название активности</span><input className="input" defaultValue={a.title} onBlur={e => updateActivity(a.id, 'title', e.target.value)}/></label></div><label className="switch-line"><input type="checkbox" defaultChecked={a.is_active} onChange={e => updateActivity(a.id, 'is_active', e.target.checked)}/> Показывать ребятам</label></div><div className="admin-fields calendar-fields"><label><span>Метка</span><input className="input" defaultValue={a.tag} onBlur={e => updateActivity(a.id, 'tag', e.target.value)}/></label><label><span>Вид</span><select defaultValue={a.type} onChange={e => updateActivity(a.id, 'type', e.target.value)}>{activityTypes.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span>Плановое время, часы</span><input className="input" type="number" step="0.5" defaultValue={minutesToHours(a.estimated_minutes)} onBlur={e => updateActivity(a.id, 'estimated_minutes', hoursToMinutes(e.target.value, 1))} placeholder="ч."/></label><label className="wide"><span>О чём это</span><textarea defaultValue={a.description} onBlur={e => updateActivity(a.id, 'description', e.target.value)} /></label><label className="wide"><span>Твоё задание</span><textarea defaultValue={a.task} onBlur={e => updateActivity(a.id, 'task', e.target.value)} /></label><label className="wide"><span>Как делать</span><textarea defaultValue={a.how_to} onBlur={e => updateActivity(a.id, 'how_to', e.target.value)} /></label><label className="wide"><span>Что собрать</span><textarea defaultValue={a.collect} onBlur={e => updateActivity(a.id, 'collect', e.target.value)} /></label><label className="wide"><span>Что отправить</span><textarea defaultValue={a.send_to_admin} onBlur={e => updateActivity(a.id, 'send_to_admin', e.target.value)} /></label></div></article>)}</div>}
+        </div>
+      </section>
     </main>
   </>;
 }
