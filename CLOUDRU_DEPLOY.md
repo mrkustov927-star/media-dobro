@@ -24,8 +24,9 @@ Container Apps требует образ формата linux/amd64. Workflow у
 - `CLOUDRU_REGISTRY_USERNAME`;
 - `CLOUDRU_REGISTRY_PASSWORD`.
 
-После этого вручную запустите workflow `Build image for Cloud.ru`
-из ветки `cloudru-migration`.
+Пока секреты не заполнены, автоматическая сборка безопасно пропускается.
+После их добавления сообщите об этом: следующий коммит в
+`cloudru-migration` автоматически соберёт и загрузит образ.
 
 ## 3. Переменные Container App
 
