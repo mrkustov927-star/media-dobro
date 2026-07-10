@@ -1,0 +1,7 @@
+.git
+.github
+dobro-media-cabinet/node_modules
+dobro-media-cabinet/.next
+dobro-media-cabinet/.env
+dobro-media-cabinet/.env.local
+dobro-media-cabinet/npm-debug.log*
