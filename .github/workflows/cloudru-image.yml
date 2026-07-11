@@ -53,6 +53,8 @@ jobs:
           file: ./Dockerfile.cloudru
           platforms: linux/amd64
           push: true
+          provenance: false
+          sbom: false
           tags: |
             ${{ env.CLOUDRU_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.CLOUDRU_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
