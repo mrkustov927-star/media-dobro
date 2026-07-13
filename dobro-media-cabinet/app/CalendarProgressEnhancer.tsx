@@ -7,7 +7,6 @@ type ActivityRow = {
   id: string;
   day: number;
   title: string;
-  type: string;
   sort_order: number;
   is_active: boolean;
 };
@@ -15,15 +14,8 @@ type ActivityRow = {
 type AssignmentRow = {
   id: string;
   activity_id: string;
-  volunteer_name: string;
   status: string;
-  volunteer_comment: string | null;
 };
-
-function getTopic(assignment: AssignmentRow) {
-  const firstLine = String(assignment.volunteer_comment || '').split('\n')[0]?.trim() || '';
-  return firstLine.startsWith('Тема:') ? firstLine.replace(/^Тема:\s*/, '').trim() : '';
-}
 
 function getState(assignments: AssignmentRow[]) {
   if (!assignments.length) return 'free';
@@ -44,8 +36,8 @@ export default function CalendarProgressEnhancer() {
 
     async function applyCalendarProgress() {
       const [{ data: activities }, { data: assignments }] = await Promise.all([
-        supabase.from('activities').select('id,day,title,type,sort_order,is_active').eq('is_active', true).order('sort_order'),
-        supabase.from('assignments').select('id,activity_id,volunteer_name,status,volunteer_comment').neq('status', 'Отменено').order('created_at', { ascending: true })
+        supabase.from('activities').select('id,day,title,sort_order,is_active').eq('is_active', true).order('sort_order'),
+        supabase.from('assignments').select('id,activity_id,status').neq('status', 'Отменено').order('created_at', { ascending: true })
       ]);
 
       if (cancelled || !activities || !assignments) return;
@@ -53,6 +45,7 @@ export default function CalendarProgressEnhancer() {
       const activityRows = activities as ActivityRow[];
       const assignmentRows = assignments as AssignmentRow[];
       const byActivity = new Map<string, AssignmentRow[]>();
+
       assignmentRows.forEach(assignment => {
         const list = byActivity.get(assignment.activity_id) || [];
         list.push(assignment);
@@ -76,12 +69,13 @@ export default function CalendarProgressEnhancer() {
         const key = `${day}|||${title}`;
         const index = occurrences.get(key) || 0;
         occurrences.set(key, index + 1);
+
         const activity = byKey.get(key)?.[index];
         if (!activity) return;
 
         const currentAssignments = byActivity.get(activity.id) || [];
         const completed = currentAssignments.filter(item => item.status === 'Зачтено').length;
-        const inProgress = currentAssignments.length - completed;
+        const total = currentAssignments.length;
         const state = getState(currentAssignments);
 
         button.classList.remove('activity-pill-free', 'activity-pill-active', 'activity-pill-partial', 'activity-pill-complete');
@@ -95,79 +89,49 @@ export default function CalendarProgressEnhancer() {
 
         const stateLabel = state === 'free'
           ? 'Свободно'
-          : state === 'complete'
-            ? 'Завершено'
+          : state === 'active'
+            ? 'В работе'
             : state === 'partial'
-              ? `${completed} из ${currentAssignments.length}`
-              : currentAssignments.length > 1
-                ? `В работе · ${currentAssignments.length}`
-                : 'В работе';
-        setText(stateElement, stateLabel);
+              ? 'Частично'
+              : 'Завершено';
 
-        const meta = button.querySelector('.activity-meta');
         const metaText = state === 'free'
-          ? 'Можно взять это задание'
-          : state === 'complete'
-            ? currentAssignments.length > 1
-              ? `Все ${currentAssignments.length} работы завершены`
-              : 'Работа завершена'
-            : state === 'partial'
-              ? `${completed} завершено · ${inProgress} в работе`
-              : currentAssignments.length > 1
-                ? `${currentAssignments.length} работы в процессе`
-                : `В работе: ${currentAssignments[0]?.volunteer_name || ''}`;
-        setText(meta, metaText);
+          ? 'Можно взять задание'
+          : `Завершено: ${completed} из ${total}`;
 
+        setText(stateElement, stateLabel);
+        setText(button.querySelector('.activity-meta'), metaText);
         button.querySelector('.calendar-topic-list')?.remove();
-        if (activity.type === 'd' && currentAssignments.length) {
-          const list = document.createElement('span');
-          list.className = 'calendar-topic-list';
-
-          currentAssignments.slice(0, 4).forEach(assignment => {
-            const isComplete = assignment.status === 'Зачтено';
-            const row = document.createElement('span');
-            row.className = `calendar-topic-row calendar-topic-row-${isComplete ? 'complete' : 'active'}`;
-
-            const marker = document.createElement('span');
-            marker.className = 'calendar-topic-marker';
-            marker.textContent = isComplete ? '✓' : '•';
-
-            const copy = document.createElement('span');
-            copy.className = 'calendar-topic-copy';
-
-            const topic = document.createElement('span');
-            topic.className = 'calendar-topic-name';
-            topic.textContent = getTopic(assignment) || 'Без названия темы';
-
-            const person = document.createElement('span');
-            person.className = 'calendar-topic-person';
-            person.textContent = `${assignment.volunteer_name} · ${isComplete ? 'завершено' : 'в работе'}`;
-
-            copy.append(topic, person);
-            row.append(marker, copy);
-            list.append(row);
-          });
-
-          if (currentAssignments.length > 4) {
-            const more = document.createElement('span');
-            more.className = 'calendar-topic-more';
-            more.textContent = `Ещё ${currentAssignments.length - 4}`;
-            list.append(more);
-          }
-
-          button.append(list);
-        }
+        button.setAttribute('aria-label', `${title}. ${stateLabel}. ${metaText}. Нажмите, чтобы открыть подробности.`);
       });
 
+      setText(
+        document.querySelector('#calendar .head .note'),
+        'Нажми на карточку: внутри — описание, участники, темы и статус каждой работы.'
+      );
+      setText(
+        document.querySelector('#calendar .calendar-help-copy span'),
+        'В сетке показан общий прогресс. Подробности открываются по нажатию.'
+      );
+
       const legend = document.querySelector('#calendar .calendar-legend');
-      if (legend && !legend.querySelector('.legend-partial')) {
-        const item = document.createElement('span');
-        item.className = 'legend-partial';
-        const dot = document.createElement('i');
-        dot.className = 'legend-dot partial';
-        item.append(dot, document.createTextNode('Частично завершено'));
-        const complete = legend.querySelector('span:last-child');
-        legend.insertBefore(item, complete);
+      if (legend) {
+        let partialItem = legend.querySelector('.legend-partial');
+        if (!partialItem) {
+          const item = document.createElement('span');
+          item.className = 'legend-partial';
+          const dot = document.createElement('i');
+          dot.className = 'legend-dot partial';
+          item.append(dot, document.createTextNode('Частично'));
+          const complete = legend.querySelector('span:last-child');
+          legend.insertBefore(item, complete);
+          partialItem = item;
+        } else {
+          setText(partialItem, 'Частично');
+          const dot = document.createElement('i');
+          dot.className = 'legend-dot partial';
+          partialItem.prepend(dot);
+        }
       }
     }
 
