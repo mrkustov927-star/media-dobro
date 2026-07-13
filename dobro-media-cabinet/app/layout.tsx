@@ -4,12 +4,15 @@ import './vk.css';
 import './calendar-status.css';
 import './calendar.css';
 import './pending.css';
+import './calendar-progress.css';
+import CalendarProgressEnhancer from './CalendarProgressEnhancer';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
       <body>
         {children}
+        <CalendarProgressEnhancer />
         <script
           dangerouslySetInnerHTML={{
             __html: `
