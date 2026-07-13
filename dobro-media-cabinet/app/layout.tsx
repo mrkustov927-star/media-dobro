@@ -3,6 +3,7 @@ import './extra.css';
 import './vk.css';
 import './calendar-status.css';
 import './calendar.css';
+import './pending.css';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

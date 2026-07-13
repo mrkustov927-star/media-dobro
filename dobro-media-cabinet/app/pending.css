@@ -1,0 +1,5 @@
+.btn:disabled {
+  opacity: 0.62;
+  cursor: wait;
+  pointer-events: none;
+}

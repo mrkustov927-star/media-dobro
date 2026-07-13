@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 export function minutesToHoursText(minutes?: number | null) {
   if (!minutes) return 'не указано';
   const hours = minutes / 60;
@@ -67,7 +69,14 @@ async function notifyByEmail(text: string) {
   }
 }
 
-export async function sendVkAdminMessage(text: string) {
+export function vkRandomIdForEvent(eventKey?: string) {
+  if (!eventKey) return Math.floor(Math.random() * 2147483646) + 1;
+
+  const digest = createHash('sha256').update(eventKey).digest();
+  return (digest.readUInt32BE(0) & 0x7fffffff) || 1;
+}
+
+export async function sendVkAdminMessage(text: string, eventKey?: string) {
   const token = process.env.VK_GROUP_TOKEN?.trim();
   const peerId = process.env.VK_ADMIN_PEER_ID?.trim();
   const version = process.env.VK_API_VERSION?.trim() || '5.199';
@@ -77,7 +86,7 @@ export async function sendVkAdminMessage(text: string) {
   }
 
   try {
-    const randomId = Math.floor(Math.random() * 2147483647);
+    const randomId = vkRandomIdForEvent(eventKey);
     const params = new URLSearchParams({
       access_token: token,
       v: version,
@@ -106,10 +115,10 @@ export async function sendVkAdminMessage(text: string) {
   }
 }
 
-export async function notifyAdmin(text: string) {
+export async function notifyAdmin(text: string, eventKey?: string) {
   await Promise.allSettled([
     notifyByTelegram(text),
     notifyByEmail(text),
-    sendVkAdminMessage(text)
+    sendVkAdminMessage(text, eventKey)
   ]);
 }

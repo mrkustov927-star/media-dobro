@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { initialActivities } from '@/lib/initialActivities';
 import type { Activity, Assignment } from '@/lib/types';
@@ -40,6 +40,18 @@ function hoursToMinutes(value: string, fallbackHours = 1) {
   const hours = Number(normalized);
   if (!Number.isFinite(hours) || hours <= 0) return Math.round(fallbackHours * 60);
   return Math.round(hours * 60);
+}
+
+function createRequestId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, character => {
+    const random = Math.floor(Math.random() * 16);
+    const value = character === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
 }
 
 function minutesToHours(minutes?: number | null) {
@@ -89,6 +101,11 @@ export default function Page() {
   const [materialUrl, setMaterialUrl] = useState('');
   const [comment, setComment] = useState('');
   const [message, setMessage] = useState('');
+  const [claimPending, setClaimPending] = useState(false);
+  const [submitPending, setSubmitPending] = useState(false);
+  const claimPendingRef = useRef(false);
+  const submitPendingRef = useRef(false);
+  const claimRequestIdRef = useRef('');
 
   async function loadData() {
     await fetch('/api/bootstrap-calendar', { method: 'POST' }).catch(() => null);
@@ -110,6 +127,10 @@ export default function Page() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  useEffect(() => {
+    claimRequestIdRef.current = '';
+  }, [selected?.id]);
+
   const byDay = useMemo(() => {
     const map = new Map<number, Activity[]>();
     activities.filter(a => a.is_active).forEach(a => {
@@ -129,6 +150,7 @@ export default function Page() {
 
   async function claimActivity() {
     if (!selected) return;
+    if (claimPendingRef.current) return;
     setMessage('');
     if (!name.trim()) {
       setMessage('Напиши имя и фамилию, чтобы взять активность.');
@@ -143,28 +165,42 @@ export default function Page() {
       setMessage('Календарь обновляется. Открой активность ещё раз и нажми кнопку повторно.');
       return;
     }
-    const res = await fetch('/api/claim', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        activity_id: selected.id,
-        volunteer_name: name,
-        topic_title: selectedIsOwnTopic ? topicTitle : '',
-        planned_minutes: hoursToMinutes(planned, 1)
-      })
-    });
-    const json = await res.json();
-    if (!res.ok) setMessage(json.error || 'Не удалось взять активность. Попробуй ещё раз.');
-    else {
-      setMessage('Активность взята. Теперь она видна всем ребятам.');
-      setName('');
-      setTopicTitle('');
-      setPlanned('');
-      await loadData();
+    claimPendingRef.current = true;
+    setClaimPending(true);
+    claimRequestIdRef.current ||= createRequestId();
+
+    try {
+      const res = await fetch('/api/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          request_id: claimRequestIdRef.current,
+          activity_id: selected.id,
+          volunteer_name: name,
+          topic_title: selectedIsOwnTopic ? topicTitle : '',
+          planned_minutes: hoursToMinutes(planned, 1)
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) setMessage(json.error || 'Не удалось взять активность. Попробуй ещё раз.');
+      else {
+        claimRequestIdRef.current = '';
+        setMessage(json.duplicate ? 'Активность уже была взята. Повтор не создан.' : 'Активность взята. Теперь она видна всем ребятам.');
+        setName('');
+        setTopicTitle('');
+        setPlanned('');
+        await loadData();
+      }
+    } catch {
+      setMessage('Не удалось получить ответ сервера. Нажми ещё раз — повторная заявка не создастся.');
+    } finally {
+      claimPendingRef.current = false;
+      setClaimPending(false);
     }
   }
 
   async function sendMaterial() {
+    if (submitPendingRef.current) return;
     setMessage('');
     if (!submitAssignment) {
       setMessage('Сначала выбери свою запись в списке.');
@@ -182,25 +218,35 @@ export default function Page() {
       return;
     }
 
-    const res = await fetch('/api/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        assignment_id: submitAssignment,
-        spent_minutes: Math.round(spentHours * 60),
-        material_url: materialUrl,
-        volunteer_comment: comment
-      })
-    });
-    const json = await res.json();
-    if (!res.ok) setMessage(json.error || 'Не удалось сдать материал. Попробуй ещё раз.');
-    else {
-      setMessage('Материал отправлен на проверку Кустову Евгению Валерьевичу.');
-      setSubmitAssignment('');
-      setMaterialUrl('');
-      setComment('');
-      setSpent('');
-      await loadData();
+    submitPendingRef.current = true;
+    setSubmitPending(true);
+
+    try {
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignment_id: submitAssignment,
+          spent_minutes: Math.round(spentHours * 60),
+          material_url: materialUrl,
+          volunteer_comment: comment
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) setMessage(json.error || 'Не удалось сдать материал. Попробуй ещё раз.');
+      else {
+        setMessage(json.duplicate ? 'Материал уже был отправлен. Повторное уведомление не создано.' : 'Материал отправлен на проверку Кустову Евгению Валерьевичу.');
+        setSubmitAssignment('');
+        setMaterialUrl('');
+        setComment('');
+        setSpent('');
+        await loadData();
+      }
+    } catch {
+      setMessage('Не удалось получить ответ сервера. Нажми ещё раз — повторное уведомление не отправится.');
+    } finally {
+      submitPendingRef.current = false;
+      setSubmitPending(false);
     }
   }
 
@@ -363,10 +409,10 @@ export default function Page() {
           </div>
           <div className="form">
             <h3>Взять активность</h3>
-            <label><b>Имя и фамилия</b><input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Например: Иванова Анна" /></label>
-            {selectedIsOwnTopic ? <label><b>Название своей темы</b><input className="input" value={topicTitle} onChange={e => setTopicTitle(e.target.value)} placeholder="Например: Игры, интервью, летний двор" /></label> : null}
-            <label><b>Планируемое время, часы</b><input className="input" value={planned} onChange={e => setPlanned(e.target.value)} placeholder="Например: 1" type="number" step="0.5" /></label>
-            <button className="btn primary" onClick={claimActivity}>Взять активность</button>
+            <label><b>Имя и фамилия</b><input className="input" value={name} onChange={e => { setName(e.target.value); claimRequestIdRef.current = ''; }} placeholder="Например: Иванова Анна" /></label>
+            {selectedIsOwnTopic ? <label><b>Название своей темы</b><input className="input" value={topicTitle} onChange={e => { setTopicTitle(e.target.value); claimRequestIdRef.current = ''; }} placeholder="Например: Игры, интервью, летний двор" /></label> : null}
+            <label><b>Планируемое время, часы</b><input className="input" value={planned} onChange={e => { setPlanned(e.target.value); claimRequestIdRef.current = ''; }} placeholder="Например: 1" type="number" step="0.5" /></label>
+            <button className="btn primary" onClick={claimActivity} disabled={claimPending}>{claimPending ? 'Отправляем…' : 'Взять активность'}</button>
           </div>
           <div className="form">
             <h3>Сдать материал</h3>
@@ -375,7 +421,7 @@ export default function Page() {
             <label><b>Потраченное время, часы</b><input className="input" value={spent} onChange={e => setSpent(e.target.value)} placeholder="Например: 1,5" type="number" step="0.5" /></label>
             <label><b>Ссылка на материалы</b><input className="input" value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="Обязательно: ссылка на фото, видео или документ" /></label>
             <label><b>Комментарий</b><textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Что сделал(а), что приложено, что нужно проверить" /></label>
-            <button className="btn primary" onClick={sendMaterial}>Сдать на проверку</button>
+            <button className="btn primary" onClick={sendMaterial} disabled={submitPending}>{submitPending ? 'Отправляем…' : 'Сдать на проверку'}</button>
           </div>
           {message && <p><b>{message}</b></p>}
         </div>
