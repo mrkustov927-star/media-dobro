@@ -37,11 +37,21 @@ export async function POST(request: Request) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
-    const { data: existing } = await supabaseAdmin
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from('assignments')
-      .select('volunteer_comment')
+      .select('*')
       .eq('id', assignment_id)
-      .single();
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Запись не найдена' }, { status: 404 });
+    }
+
+    if (existing.status === 'Материал сдан') {
+      return NextResponse.json({ data: existing, duplicate: true });
+    }
 
     const topicTitle = getTopicFromComment(existing?.volunteer_comment);
     const savedVolunteerComment = buildVolunteerComment(topicTitle, volunteer_comment);
@@ -58,10 +68,26 @@ export async function POST(request: Request) {
       .from('assignments')
       .update(updatePayload)
       .eq('id', assignment_id)
+      .neq('status', 'Материал сдан')
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+
+    if (!data) {
+      const { data: current, error: currentError } = await supabaseAdmin
+        .from('assignments')
+        .select('*')
+        .eq('id', assignment_id)
+        .maybeSingle();
+
+      if (currentError) throw currentError;
+      if (current?.status === 'Материал сдан') {
+        return NextResponse.json({ data: current, duplicate: true });
+      }
+
+      return NextResponse.json({ error: 'Запись изменилась. Обновите страницу и попробуйте снова.' }, { status: 409 });
+    }
 
     let activityTitle = data?.activity_id || 'не указано';
     if (data?.activity_id) {
@@ -86,7 +112,7 @@ export async function POST(request: Request) {
       'Материал ждёт проверки в админке.'
     ];
 
-    await notifyAdmin(messageLines.filter(Boolean).join('\n'));
+    await notifyAdmin(messageLines.filter(Boolean).join('\n'), `submit:${data.id}:${data.updated_at}`);
 
     return NextResponse.json({ data });
   } catch (error: any) {
