@@ -29,108 +29,128 @@ function setText(element: Element | null, value: string) {
   if (element && element.textContent !== value) element.textContent = value;
 }
 
+function ensureSinglePartialLegendItem() {
+  const legend = document.querySelector('#calendar .calendar-legend');
+  if (!legend) return;
+
+  const existingItems = Array.from(legend.querySelectorAll<HTMLElement>('.legend-partial'));
+  const partialItem = existingItems[0] || document.createElement('span');
+
+  existingItems.slice(1).forEach(item => item.remove());
+
+  partialItem.className = 'legend-partial';
+  const dot = document.createElement('i');
+  dot.className = 'legend-dot partial';
+  partialItem.replaceChildren(dot, document.createTextNode('Частично'));
+
+  if (!partialItem.isConnected) {
+    const complete = legend.querySelector('span:last-child');
+    legend.insertBefore(partialItem, complete);
+  }
+}
+
 export default function CalendarProgressEnhancer() {
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let applying = false;
+    let rerunRequested = false;
 
     async function applyCalendarProgress() {
-      const [{ data: activities }, { data: assignments }] = await Promise.all([
-        supabase.from('activities').select('id,day,title,sort_order,is_active').eq('is_active', true).order('sort_order'),
-        supabase.from('assignments').select('id,activity_id,status').neq('status', 'Отменено').order('created_at', { ascending: true })
-      ]);
+      if (applying) {
+        rerunRequested = true;
+        return;
+      }
 
-      if (cancelled || !activities || !assignments) return;
+      applying = true;
+      ensureSinglePartialLegendItem();
 
-      const activityRows = activities as ActivityRow[];
-      const assignmentRows = assignments as AssignmentRow[];
-      const byActivity = new Map<string, AssignmentRow[]>();
+      try {
+        const [{ data: activities }, { data: assignments }] = await Promise.all([
+          supabase.from('activities').select('id,day,title,sort_order,is_active').eq('is_active', true).order('sort_order'),
+          supabase.from('assignments').select('id,activity_id,status').neq('status', 'Отменено').order('created_at', { ascending: true })
+        ]);
 
-      assignmentRows.forEach(assignment => {
-        const list = byActivity.get(assignment.activity_id) || [];
-        list.push(assignment);
-        byActivity.set(assignment.activity_id, list);
-      });
+        if (cancelled || !activities || !assignments) return;
 
-      const byKey = new Map<string, ActivityRow[]>();
-      activityRows.forEach(activity => {
-        const key = `${activity.day}|||${activity.title}`;
-        const list = byKey.get(key) || [];
-        list.push(activity);
-        byKey.set(key, list);
-      });
+        const activityRows = activities as ActivityRow[];
+        const assignmentRows = assignments as AssignmentRow[];
+        const byActivity = new Map<string, AssignmentRow[]>();
 
-      const occurrences = new Map<string, number>();
-      const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('#calendar .activity-pill'));
+        assignmentRows.forEach(assignment => {
+          const list = byActivity.get(assignment.activity_id) || [];
+          list.push(assignment);
+          byActivity.set(assignment.activity_id, list);
+        });
 
-      buttons.forEach(button => {
-        const day = Number(button.closest('.day')?.querySelector('.num')?.textContent || 0);
-        const title = button.querySelector(':scope > b')?.textContent?.trim() || '';
-        const key = `${day}|||${title}`;
-        const index = occurrences.get(key) || 0;
-        occurrences.set(key, index + 1);
+        const byKey = new Map<string, ActivityRow[]>();
+        activityRows.forEach(activity => {
+          const key = `${activity.day}|||${activity.title}`;
+          const list = byKey.get(key) || [];
+          list.push(activity);
+          byKey.set(key, list);
+        });
 
-        const activity = byKey.get(key)?.[index];
-        if (!activity) return;
+        const occurrences = new Map<string, number>();
+        const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('#calendar .activity-pill'));
 
-        const currentAssignments = byActivity.get(activity.id) || [];
-        const completed = currentAssignments.filter(item => item.status === 'Зачтено').length;
-        const total = currentAssignments.length;
-        const state = getState(currentAssignments);
+        buttons.forEach(button => {
+          const day = Number(button.closest('.day')?.querySelector('.num')?.textContent || 0);
+          const title = button.querySelector(':scope > b')?.textContent?.trim() || '';
+          const key = `${day}|||${title}`;
+          const index = occurrences.get(key) || 0;
+          occurrences.set(key, index + 1);
 
-        button.classList.remove('activity-pill-free', 'activity-pill-active', 'activity-pill-partial', 'activity-pill-complete');
-        button.classList.add(`activity-pill-${state}`);
+          const activity = byKey.get(key)?.[index];
+          if (!activity) return;
 
-        const stateElement = button.querySelector('.calendar-state');
-        if (stateElement) {
-          stateElement.classList.remove('calendar-state-free', 'calendar-state-active', 'calendar-state-partial', 'calendar-state-complete');
-          stateElement.classList.add(`calendar-state-${state}`);
-        }
+          const currentAssignments = byActivity.get(activity.id) || [];
+          const completed = currentAssignments.filter(item => item.status === 'Зачтено').length;
+          const total = currentAssignments.length;
+          const state = getState(currentAssignments);
 
-        const stateLabel = state === 'free'
-          ? 'Свободно'
-          : state === 'active'
-            ? 'В работе'
-            : state === 'partial'
-              ? 'Частично'
-              : 'Завершено';
+          button.classList.remove('activity-pill-free', 'activity-pill-active', 'activity-pill-partial', 'activity-pill-complete');
+          button.classList.add(`activity-pill-${state}`);
 
-        const metaText = state === 'free'
-          ? 'Можно взять задание'
-          : `Завершено: ${completed} из ${total}`;
+          const stateElement = button.querySelector('.calendar-state');
+          if (stateElement) {
+            stateElement.classList.remove('calendar-state-free', 'calendar-state-active', 'calendar-state-partial', 'calendar-state-complete');
+            stateElement.classList.add(`calendar-state-${state}`);
+          }
 
-        setText(stateElement, stateLabel);
-        setText(button.querySelector('.activity-meta'), metaText);
-        button.querySelector('.calendar-topic-list')?.remove();
-        button.setAttribute('aria-label', `${title}. ${stateLabel}. ${metaText}. Нажмите, чтобы открыть подробности.`);
-      });
+          const stateLabel = state === 'free'
+            ? 'Свободно'
+            : state === 'active'
+              ? 'В работе'
+              : state === 'partial'
+                ? 'Частично'
+                : 'Завершено';
 
-      setText(
-        document.querySelector('#calendar .head .note'),
-        'Нажми на карточку: внутри — описание, участники, темы и статус каждой работы.'
-      );
-      setText(
-        document.querySelector('#calendar .calendar-help-copy span'),
-        'В сетке показан общий прогресс. Подробности открываются по нажатию.'
-      );
+          const metaText = state === 'free'
+            ? 'Можно взять задание'
+            : `Завершено: ${completed} из ${total}`;
 
-      const legend = document.querySelector('#calendar .calendar-legend');
-      if (legend) {
-        let partialItem = legend.querySelector('.legend-partial');
-        if (!partialItem) {
-          const item = document.createElement('span');
-          item.className = 'legend-partial';
-          const dot = document.createElement('i');
-          dot.className = 'legend-dot partial';
-          item.append(dot, document.createTextNode('Частично'));
-          const complete = legend.querySelector('span:last-child');
-          legend.insertBefore(item, complete);
-          partialItem = item;
-        } else {
-          setText(partialItem, 'Частично');
-          const dot = document.createElement('i');
-          dot.className = 'legend-dot partial';
-          partialItem.prepend(dot);
+          setText(stateElement, stateLabel);
+          setText(button.querySelector('.activity-meta'), metaText);
+          button.querySelector('.calendar-topic-list')?.remove();
+          button.setAttribute('aria-label', `${title}. ${stateLabel}. ${metaText}. Нажмите, чтобы открыть подробности.`);
+        });
+
+        setText(
+          document.querySelector('#calendar .head .note'),
+          'Нажми на карточку: внутри — описание, участники, темы и статус каждой работы.'
+        );
+        setText(
+          document.querySelector('#calendar .calendar-help-copy span'),
+          'В сетке показан общий прогресс. Подробности открываются по нажатию.'
+        );
+
+        ensureSinglePartialLegendItem();
+      } finally {
+        applying = false;
+        if (rerunRequested && !cancelled) {
+          rerunRequested = false;
+          void applyCalendarProgress();
         }
       }
     }
