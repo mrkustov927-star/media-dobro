@@ -17,12 +17,39 @@ type AssignmentRow = {
   status: string;
 };
 
-function getState(assignments: AssignmentRow[]) {
+type CalendarState = 'free' | 'active' | 'partial' | 'complete' | 'expired';
+
+function getState(assignments: AssignmentRow[]): Exclude<CalendarState, 'expired'> {
   if (!assignments.length) return 'free';
   const completed = assignments.filter(item => item.status === 'Зачтено').length;
   if (completed === assignments.length) return 'complete';
   if (completed > 0) return 'partial';
   return 'active';
+}
+
+function getMoscowDateParts() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Moscow',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day)
+  };
+}
+
+function isPastActivityDay(day: number) {
+  const now = getMoscowDateParts();
+  if (now.year > 2026) return true;
+  if (now.year < 2026) return false;
+  if (now.month > 7) return true;
+  if (now.month < 7) return false;
+  return now.day > day;
 }
 
 function setText(element: Element | null, value: string) {
@@ -37,7 +64,8 @@ function ensureCalendarLegend() {
     ['free', 'Свободно'],
     ['active', 'В работе'],
     ['partial', 'Частично'],
-    ['complete', 'Завершено']
+    ['complete', 'Завершено'],
+    ['expired', 'Срок прошёл']
   ] as const;
 
   const alreadyCorrect =
@@ -65,12 +93,39 @@ function ensureCalendarLegend() {
   legend.replaceChildren(fragment);
 }
 
+function showClosedClaimNotice() {
+  const card = document.querySelector<HTMLElement>('.modal.open .modal-card');
+  if (!card) return;
+
+  const forms = card.querySelectorAll<HTMLElement>(':scope > .form');
+  const claimForm = forms[0];
+  if (claimForm) claimForm.hidden = true;
+
+  if (card.querySelector('.claim-closed-notice')) return;
+
+  const notice = document.createElement('div');
+  notice.className = 'claim-closed-notice';
+  notice.innerHTML = '<b>Новые участники уже не могут взять эту активность.</b><span>Дата задания прошла, но ранее взятые работы можно продолжать и сдавать на проверку.</span>';
+
+  const submitForm = forms[1];
+  card.insertBefore(notice, submitForm || null);
+}
+
 export default function CalendarProgressEnhancer() {
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let applying = false;
     let rerunRequested = false;
+
+    function handleCalendarClick(event: MouseEvent) {
+      const target = event.target instanceof Element
+        ? event.target.closest<HTMLButtonElement>('#calendar .activity-pill')
+        : null;
+
+      if (!target || target.disabled || target.dataset.claimClosed !== 'true') return;
+      setTimeout(showClosedClaimNotice, 0);
+    }
 
     async function applyCalendarProgress() {
       if (applying) {
@@ -123,14 +178,17 @@ export default function CalendarProgressEnhancer() {
           const currentAssignments = byActivity.get(activity.id) || [];
           const completed = currentAssignments.filter(item => item.status === 'Зачтено').length;
           const total = currentAssignments.length;
-          const state = getState(currentAssignments);
+          const claimClosed = isPastActivityDay(activity.day);
+          const state: CalendarState = claimClosed && total === 0 ? 'expired' : getState(currentAssignments);
 
-          button.classList.remove('activity-pill-free', 'activity-pill-active', 'activity-pill-partial', 'activity-pill-complete');
+          button.classList.remove('activity-pill-free', 'activity-pill-active', 'activity-pill-partial', 'activity-pill-complete', 'activity-pill-expired');
           button.classList.add(`activity-pill-${state}`);
+          button.disabled = state === 'expired';
+          button.dataset.claimClosed = claimClosed ? 'true' : 'false';
 
           const stateElement = button.querySelector('.calendar-state');
           if (stateElement) {
-            stateElement.classList.remove('calendar-state-free', 'calendar-state-active', 'calendar-state-partial', 'calendar-state-complete');
+            stateElement.classList.remove('calendar-state-free', 'calendar-state-active', 'calendar-state-partial', 'calendar-state-complete', 'calendar-state-expired');
             stateElement.classList.add(`calendar-state-${state}`);
           }
 
@@ -140,16 +198,25 @@ export default function CalendarProgressEnhancer() {
               ? 'В работе'
               : state === 'partial'
                 ? 'Частично'
-                : 'Завершено';
+                : state === 'complete'
+                  ? 'Завершено'
+                  : 'Срок прошёл';
 
-          const metaText = state === 'free'
-            ? 'Можно взять задание'
-            : `Завершено: ${completed} из ${total}`;
+          const metaText = state === 'expired'
+            ? 'Задание уже недоступно'
+            : state === 'free'
+              ? 'Можно взять задание'
+              : `Завершено: ${completed} из ${total}`;
 
           setText(stateElement, stateLabel);
           setText(button.querySelector('.activity-meta'), metaText);
           button.querySelector('.calendar-topic-list')?.remove();
-          button.setAttribute('aria-label', `${title}. ${stateLabel}. ${metaText}. Нажмите, чтобы открыть подробности.`);
+          button.setAttribute(
+            'aria-label',
+            state === 'expired'
+              ? `${title}. Срок задания прошёл. Активность недоступна.`
+              : `${title}. ${stateLabel}. ${metaText}. Нажмите, чтобы открыть подробности.`
+          );
         });
 
         setText(
@@ -158,7 +225,7 @@ export default function CalendarProgressEnhancer() {
         );
         setText(
           document.querySelector('#calendar .calendar-help-copy span'),
-          'В сетке показан общий прогресс. Подробности открываются по нажатию.'
+          'Незанятые задания закрываются на следующий день. Взятые работы остаются доступными для сдачи.'
         );
 
         ensureCalendarLegend();
@@ -176,9 +243,11 @@ export default function CalendarProgressEnhancer() {
       timer = setTimeout(() => { void applyCalendarProgress(); }, delay);
     }
 
+    document.addEventListener('click', handleCalendarClick);
     schedule(150);
     setTimeout(() => schedule(0), 700);
     setTimeout(() => schedule(0), 1800);
+    const clockTimer = window.setInterval(() => schedule(0), 60_000);
 
     const channel = supabase
       .channel('dobro-media-calendar-progress')
@@ -189,6 +258,8 @@ export default function CalendarProgressEnhancer() {
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      window.clearInterval(clockTimer);
+      document.removeEventListener('click', handleCalendarClick);
       void supabase.removeChannel(channel);
     };
   }, []);
