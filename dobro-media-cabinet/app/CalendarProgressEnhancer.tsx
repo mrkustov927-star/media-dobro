@@ -29,29 +29,40 @@ function setText(element: Element | null, value: string) {
   if (element && element.textContent !== value) element.textContent = value;
 }
 
-function ensureSinglePartialLegendItem() {
-  const legend = document.querySelector('#calendar .calendar-legend');
+function ensureCalendarLegend() {
+  const legend = document.querySelector<HTMLElement>('#calendar .calendar-legend');
   if (!legend) return;
 
-  Array.from(legend.children).forEach(child => {
-    const text = child.textContent?.trim().toLocaleLowerCase('ru-RU') || '';
-    if (child.classList.contains('legend-partial') || text.startsWith('частично')) {
-      child.remove();
-    }
+  const items = [
+    ['free', 'Свободно'],
+    ['active', 'В работе'],
+    ['partial', 'Частично'],
+    ['complete', 'Завершено']
+  ] as const;
+
+  const alreadyCorrect =
+    legend.children.length === items.length &&
+    items.every(([state, label], index) => {
+      const item = legend.children[index] as HTMLElement | undefined;
+      const dots = item?.querySelectorAll('.legend-dot') || [];
+      return item?.textContent?.trim() === label && dots.length === 1 && dots[0]?.classList.contains(state);
+    });
+
+  if (alreadyCorrect) return;
+
+  const fragment = document.createDocumentFragment();
+  items.forEach(([state, label]) => {
+    const item = document.createElement('span');
+    if (state === 'partial') item.className = 'legend-partial';
+
+    const dot = document.createElement('i');
+    dot.className = `legend-dot ${state}`;
+
+    item.append(dot, document.createTextNode(label));
+    fragment.append(item);
   });
 
-  legend.querySelectorAll('.legend-dot.partial').forEach(dot => dot.remove());
-
-  const partialItem = document.createElement('span');
-  partialItem.className = 'legend-partial';
-
-  const dot = document.createElement('i');
-  dot.className = 'legend-dot partial';
-
-  partialItem.append(dot, document.createTextNode('Частично'));
-
-  const completeItem = legend.querySelector('.legend-dot.complete')?.closest('span');
-  legend.insertBefore(partialItem, completeItem || null);
+  legend.replaceChildren(fragment);
 }
 
 export default function CalendarProgressEnhancer() {
@@ -68,7 +79,7 @@ export default function CalendarProgressEnhancer() {
       }
 
       applying = true;
-      ensureSinglePartialLegendItem();
+      ensureCalendarLegend();
 
       try {
         const [{ data: activities }, { data: assignments }] = await Promise.all([
@@ -150,7 +161,7 @@ export default function CalendarProgressEnhancer() {
           'В сетке показан общий прогресс. Подробности открываются по нажатию.'
         );
 
-        ensureSinglePartialLegendItem();
+        ensureCalendarLegend();
       } finally {
         applying = false;
         if (rerunRequested && !cancelled) {
