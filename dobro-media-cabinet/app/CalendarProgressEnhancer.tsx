@@ -33,20 +33,25 @@ function ensureSinglePartialLegendItem() {
   const legend = document.querySelector('#calendar .calendar-legend');
   if (!legend) return;
 
-  const existingItems = Array.from(legend.querySelectorAll<HTMLElement>('.legend-partial'));
-  const partialItem = existingItems[0] || document.createElement('span');
+  Array.from(legend.children).forEach(child => {
+    const text = child.textContent?.trim().toLocaleLowerCase('ru-RU') || '';
+    if (child.classList.contains('legend-partial') || text.startsWith('частично')) {
+      child.remove();
+    }
+  });
 
-  existingItems.slice(1).forEach(item => item.remove());
+  legend.querySelectorAll('.legend-dot.partial').forEach(dot => dot.remove());
 
+  const partialItem = document.createElement('span');
   partialItem.className = 'legend-partial';
+
   const dot = document.createElement('i');
   dot.className = 'legend-dot partial';
-  partialItem.replaceChildren(dot, document.createTextNode('Частично'));
 
-  if (!partialItem.isConnected) {
-    const complete = legend.querySelector('span:last-child');
-    legend.insertBefore(partialItem, complete);
-  }
+  partialItem.append(dot, document.createTextNode('Частично'));
+
+  const completeItem = legend.querySelector('.legend-dot.complete')?.closest('span');
+  legend.insertBefore(partialItem, completeItem || null);
 }
 
 export default function CalendarProgressEnhancer() {
