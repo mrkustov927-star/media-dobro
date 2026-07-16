@@ -34,18 +34,38 @@ function buildSummary(card: HTMLElement, kind: ListKind) {
   return [volunteer, topic ? `Тема: ${topic}` : null, status, hours || null].filter(Boolean).join(' · ');
 }
 
+function getCardKey(card: HTMLElement, kind: ListKind) {
+  const date = card.querySelector<HTMLElement>('.admin-date')?.textContent?.trim() || '';
+  const title = kind === 'calendar'
+    ? card.querySelector<HTMLInputElement>('.admin-edit-head input.input')?.value?.trim() || ''
+    : card.querySelector<HTMLElement>('.admin-edit-head h3')?.textContent?.trim() || '';
+  const volunteer = kind === 'assignments'
+    ? card.querySelector<HTMLElement>('.assignment-fields label:first-child b')?.textContent?.trim() || ''
+    : '';
+  const topic = kind === 'assignments'
+    ? card.querySelector<HTMLElement>('.admin-topic')?.textContent?.trim() || ''
+    : '';
+  return `${kind}|${date}|${title}|${volunteer}|${topic}`;
+}
+
 function setExpanded(card: HTMLElement, expanded: boolean) {
-  card.dataset.expanded = expanded ? 'true' : 'false';
+  const nextValue = expanded ? 'true' : 'false';
+  if (card.dataset.expanded !== nextValue) card.dataset.expanded = nextValue;
+
   const button = card.querySelector<HTMLButtonElement>('.admin-card-toggle');
   if (button) {
-    button.textContent = expanded ? 'Свернуть' : 'Открыть';
-    button.setAttribute('aria-expanded', String(expanded));
+    const nextText = expanded ? 'Свернуть' : 'Открыть';
+    if (button.textContent !== nextText) button.textContent = nextText;
+    if (button.getAttribute('aria-expanded') !== String(expanded)) {
+      button.setAttribute('aria-expanded', String(expanded));
+    }
   }
 }
 
-function prepareCard(card: HTMLElement, kind: ListKind) {
+function prepareCard(card: HTMLElement, kind: ListKind, expandedKeys: Set<string>) {
   card.classList.add('admin-collapsible-card');
-  if (!card.dataset.expanded) setExpanded(card, false);
+  const cardKey = getCardKey(card, kind);
+  card.dataset.compactKey = cardKey;
 
   const head = card.querySelector<HTMLElement>('.admin-edit-head');
   if (!head) return;
@@ -57,7 +77,9 @@ function prepareCard(card: HTMLElement, kind: ListKind) {
     summary.className = 'admin-compact-summary';
     main.append(summary);
   }
-  summary.textContent = buildSummary(card, kind);
+
+  const summaryText = buildSummary(card, kind);
+  if (summary.textContent !== summaryText) summary.textContent = summaryText;
 
   let toggle = head.querySelector<HTMLButtonElement>('.admin-card-toggle');
   if (!toggle) {
@@ -71,9 +93,13 @@ function prepareCard(card: HTMLElement, kind: ListKind) {
   toggle.onclick = event => {
     event.preventDefault();
     event.stopPropagation();
-    setExpanded(card, card.dataset.expanded !== 'true');
+    const expanded = card.dataset.expanded !== 'true';
+    if (expanded) expandedKeys.add(cardKey);
+    else expandedKeys.delete(cardKey);
+    setExpanded(card, expanded);
   };
-  setExpanded(card, card.dataset.expanded === 'true');
+
+  setExpanded(card, expandedKeys.has(cardKey));
 }
 
 function matchesStatus(card: HTMLElement, kind: ListKind, filter: string) {
@@ -105,10 +131,11 @@ function applyFilter(list: HTMLElement, toolbar: HTMLElement, kind: ListKind) {
   });
 
   const count = toolbar.querySelector<HTMLElement>('.admin-list-count');
-  if (count) count.textContent = `Показано ${shown} из ${cards.length}`;
+  const countText = `Показано ${shown} из ${cards.length}`;
+  if (count && count.textContent !== countText) count.textContent = countText;
 }
 
-function createToolbar(list: HTMLElement, kind: ListKind) {
+function createToolbar(list: HTMLElement, kind: ListKind, expandedKeys: Set<string>) {
   const section = list.closest('section');
   const head = section?.querySelector('.head');
   if (!section || !head) return null;
@@ -134,10 +161,18 @@ function createToolbar(list: HTMLElement, kind: ListKind) {
   toolbar.querySelector('.admin-list-search')?.addEventListener('input', () => applyFilter(list, toolbar!, kind));
   toolbar.querySelector('.admin-list-filter')?.addEventListener('change', () => applyFilter(list, toolbar!, kind));
   toolbar.querySelector('.admin-expand-visible')?.addEventListener('click', () => {
-    list.querySelectorAll<HTMLElement>(':scope > .admin-edit-card:not([hidden])').forEach(card => setExpanded(card, true));
+    list.querySelectorAll<HTMLElement>(':scope > .admin-edit-card:not([hidden])').forEach(card => {
+      const key = card.dataset.compactKey;
+      if (key) expandedKeys.add(key);
+      setExpanded(card, true);
+    });
   });
   toolbar.querySelector('.admin-collapse-all')?.addEventListener('click', () => {
-    list.querySelectorAll<HTMLElement>(':scope > .admin-edit-card').forEach(card => setExpanded(card, false));
+    list.querySelectorAll<HTMLElement>(':scope > .admin-edit-card').forEach(card => {
+      const key = card.dataset.compactKey;
+      if (key) expandedKeys.delete(key);
+      setExpanded(card, false);
+    });
   });
 
   return toolbar;
@@ -146,15 +181,21 @@ function createToolbar(list: HTMLElement, kind: ListKind) {
 export default function AdminCompactController() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let observer: MutationObserver | null = null;
+    const expandedKeys = new Set<string>();
 
     function prepare() {
+      observer?.disconnect();
+
       document.querySelectorAll<HTMLElement>('.admin-card-list').forEach(list => {
         const kind = getListKind(list);
         list.classList.add('admin-compact-list');
-        list.querySelectorAll<HTMLElement>(':scope > .admin-edit-card').forEach(card => prepareCard(card, kind));
-        const toolbar = createToolbar(list, kind);
+        list.querySelectorAll<HTMLElement>(':scope > .admin-edit-card').forEach(card => prepareCard(card, kind, expandedKeys));
+        const toolbar = createToolbar(list, kind, expandedKeys);
         if (toolbar) applyFilter(list, toolbar, kind);
       });
+
+      observer?.observe(document.body, { childList: true, subtree: true });
     }
 
     function schedule() {
@@ -162,13 +203,12 @@ export default function AdminCompactController() {
       timer = setTimeout(prepare, 80);
     }
 
+    observer = new MutationObserver(schedule);
     prepare();
-    const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { childList: true, subtree: true });
 
     return () => {
       if (timer) clearTimeout(timer);
-      observer.disconnect();
+      observer?.disconnect();
     };
   }, []);
 
