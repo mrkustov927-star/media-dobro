@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBlagotvoriAdmin, isBlagotvoriConfigured } from '@/lib/blagotvori/supabaseAdmin';
 
+function normalizeContact(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  const digits = trimmed.replace(/\D/g, '');
+
+  // Телефоны сравниваем в едином виде, чтобы +7 911... и 8 911...
+  // не считались разными контактами.
+  if (digits.length >= 10) {
+    const lastTen = digits.slice(-10);
+    return `phone:${lastTen}`;
+  }
+
+  return trimmed
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/$/, '');
+}
+
 export async function POST(request: NextRequest) {
   if (!isBlagotvoriConfigured()) {
     return NextResponse.json(
@@ -39,29 +56,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Эта вакансия больше недоступна.' }, { status: 404 });
     }
 
-    const { count, error: countError } = await supabase
+    const { data: activeApplications, error: applicationsError } = await supabase
       .from('bt_applications')
-      .select('id', { count: 'exact', head: true })
+      .select('id,status,volunteer_name,contact')
       .eq('vacancy_id', vacancyId)
       .not('status', 'in', '("Отменено","Не участвовал")');
 
-    if (countError) throw countError;
-    if ((count || 0) >= Number(vacancy.slots)) {
-      return NextResponse.json({ error: 'Свободных мест уже нет.' }, { status: 409 });
+    if (applicationsError) throw applicationsError;
+
+    const normalizedName = volunteerName.toLocaleLowerCase('ru-RU');
+    const normalizedContact = normalizeContact(contact);
+    const duplicate = (activeApplications || []).find(application =>
+      String(application.volunteer_name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU') === normalizedName &&
+      normalizeContact(String(application.contact || '')) === normalizedContact
+    );
+
+    if (duplicate) {
+      return NextResponse.json(
+        {
+          error: 'Вы уже подали заявку на это доброе дело. Проверьте её в разделе «Мои заявки и часы».',
+          duplicate: true,
+          status: duplicate.status
+        },
+        { status: 409 }
+      );
     }
 
-    const { data: duplicate, error: duplicateError } = await supabase
-      .from('bt_applications')
-      .select('id,status')
-      .eq('vacancy_id', vacancyId)
-      .ilike('volunteer_name', volunteerName)
-      .ilike('contact', contact)
-      .not('status', 'in', '("Отменено","Не участвовал")')
-      .maybeSingle();
-
-    if (duplicateError) throw duplicateError;
-    if (duplicate) {
-      return NextResponse.json({ ok: true, duplicate: true, status: duplicate.status });
+    if ((activeApplications || []).length >= Number(vacancy.slots)) {
+      return NextResponse.json({ error: 'Свободных мест уже нет.' }, { status: 409 });
     }
 
     const { data, error } = await supabase
@@ -74,8 +96,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, duplicate: false, application: data }, { status: 201 });
   } catch (error: any) {
     const message = error?.code === '23505'
-      ? 'Такая заявка уже отправлена.'
+      ? 'Вы уже подали заявку на это доброе дело.'
       : error?.message || 'Не удалось отправить заявку.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: error?.code === '23505' ? 409 : 500 });
   }
 }
