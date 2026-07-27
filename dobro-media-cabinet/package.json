@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && node scripts/send-hours-report.mjs",
+    "build": "next build",
     "start": "next start",
     "test": "node --test tests/*.test.cjs"
   },
