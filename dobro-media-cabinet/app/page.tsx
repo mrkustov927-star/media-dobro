@@ -1,435 +1,357 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { initialActivities } from '@/lib/initialActivities';
-import type { Activity, Assignment } from '@/lib/types';
+import { FormEvent, useMemo, useState } from 'react';
+import styles from './blagotvori.module.css';
+
+type Category =
+  | 'Помощь людям'
+  | 'Природа и животные'
+  | 'Помощь на мероприятиях'
+  | 'Медиа'
+  | 'Дистанционные задания';
+
+type Vacancy = {
+  id: string;
+  day: number;
+  title: string;
+  category: Category;
+  time: string;
+  place: string;
+  hours: number;
+  slots: number;
+  freeSlots: number;
+  age: string;
+  format: 'Очно' | 'Дистанционно';
+  confirmation: string;
+  description: string;
+  duties: string[];
+  takeWithYou: string;
+};
+
+const categories: Array<'Все добрые дела' | Category> = [
+  'Все добрые дела',
+  'Помощь людям',
+  'Природа и животные',
+  'Помощь на мероприятиях',
+  'Медиа',
+  'Дистанционные задания'
+];
+
+const vacancies: Vacancy[] = [
+  {
+    id: 'festival-helper',
+    day: 15,
+    title: 'Помощь на семейном фестивале',
+    category: 'Помощь на мероприятиях',
+    time: '12:00–16:00',
+    place: 'Центр культуры',
+    hours: 4,
+    slots: 5,
+    freeSlots: 2,
+    age: 'от 14 лет',
+    format: 'Очно',
+    confirmation: 'Организатор отметит участие и фактически отработанное время.',
+    description: 'Помочь встретить участников, подсказать дорогу к площадкам и поддерживать порядок в рабочей зоне.',
+    duties: ['Прийти за 20 минут до начала', 'Пройти короткий инструктаж', 'Помогать участникам и организатору'],
+    takeWithYou: 'Удобную одежду, воду и заряженный телефон.'
+  },
+  {
+    id: 'media-photo',
+    day: 18,
+    title: 'Фотосъёмка доброго дела',
+    category: 'Медиа',
+    time: '14:00–16:00',
+    place: 'Место будет указано после записи',
+    hours: 2,
+    slots: 2,
+    freeSlots: 1,
+    age: 'от 12 лет',
+    format: 'Очно',
+    confirmation: 'Нужно отправить ссылку на папку с фотографиями.',
+    description: 'Сделать понятный фотоотчёт: общий план, процесс работы, детали и итоговый результат.',
+    duties: ['Снять не менее 15 удачных кадров', 'Не фотографировать людей без разрешения', 'Загрузить материалы в одну папку'],
+    takeWithYou: 'Телефон или фотоаппарат с заряженной батареей.'
+  },
+  {
+    id: 'books-help',
+    day: 22,
+    title: 'Помощь при сборе книг',
+    category: 'Помощь людям',
+    time: '15:00–18:00',
+    place: 'Кемь, точный адрес в подтверждённой заявке',
+    hours: 3,
+    slots: 6,
+    freeSlots: 4,
+    age: 'от 12 лет',
+    format: 'Очно',
+    confirmation: 'Организатор подтвердит присутствие и количество часов.',
+    description: 'Принять книги, рассортировать их по возрасту читателей и аккуратно упаковать для передачи.',
+    duties: ['Принимать книги', 'Сортировать по категориям', 'Подписывать и собирать коробки'],
+    takeWithYou: 'Ничего специального брать не нужно.'
+  },
+  {
+    id: 'remote-text',
+    day: 25,
+    title: 'Подготовить текст для доброй акции',
+    category: 'Дистанционные задания',
+    time: 'До 20:00',
+    place: 'Можно выполнить из дома',
+    hours: 2,
+    slots: 3,
+    freeSlots: 3,
+    age: 'от 13 лет',
+    format: 'Дистанционно',
+    confirmation: 'Нужно отправить ссылку на документ с готовым текстом.',
+    description: 'Подготовить короткий и понятный текст о предстоящей благотворительной акции по выданным фактам.',
+    duties: ['Изучить материалы', 'Написать текст без выдуманных фактов', 'Проверить имена, даты и ссылки'],
+    takeWithYou: 'Доступ к интернету и документу для работы.'
+  }
+];
 
 const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-const weeks = [
-  ['1–5 июля', [null, null, 1, 2, 3, 4, 5]],
-  ['6–12 июля', [6, 7, 8, 9, 10, 11, 12]],
-  ['13–19 июля', [13, 14, 15, 16, 17, 18, 19]],
-  ['20–26 июля', [20, 21, 22, 23, 24, 25, 26]],
-  ['27–31 июля', [27, 28, 29, 30, 31, null, null]]
-] as const;
 
-type CalendarActivityState = 'free' | 'active' | 'complete';
-
-function fallbackActivities(): Activity[] {
-  return initialActivities.map((item, index) => ({
-    id: `start-${item.day}-${index}`,
-    month: 7,
-    title: item.title,
-    day: item.day,
-    tag: item.tag,
-    type: item.type as Activity['type'],
-    description: item.description,
-    task: item.task,
-    how_to: item.how_to,
-    collect: item.collect,
-    send_to_admin: item.send_to_admin,
-    estimated_minutes: item.estimated_minutes,
-    is_active: item.is_active,
-    sort_order: item.sort_order
-  }));
-}
-
-function hoursToMinutes(value: string, fallbackHours = 1) {
-  const normalized = String(value || '').replace(',', '.');
-  const hours = Number(normalized);
-  if (!Number.isFinite(hours) || hours <= 0) return Math.round(fallbackHours * 60);
-  return Math.round(hours * 60);
-}
-
-function createRequestId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, character => {
-    const random = Math.floor(Math.random() * 16);
-    const value = character === 'x' ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
-}
-
-function minutesToHours(minutes?: number | null) {
-  if (!minutes) return '';
-  const hours = minutes / 60;
-  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace('.', ',');
-}
-
-function getAssignmentTopic(assignment: Assignment) {
-  const firstLine = String(assignment.volunteer_comment || '').split('\n')[0]?.trim() || '';
-  return firstLine.startsWith('Тема:') ? firstLine.replace(/^Тема:\s*/, '').trim() : '';
-}
-
-function assignmentLabel(assignment: Assignment) {
-  const topic = getAssignmentTopic(assignment);
-  return topic ? `${assignment.volunteer_name} — ${topic}` : assignment.volunteer_name;
-}
-
-function getCalendarActivityState(currentAssignments: Assignment[]): CalendarActivityState {
-  if (!currentAssignments.length) return 'free';
-  return currentAssignments.every(assignment => assignment.status === 'Зачтено') ? 'complete' : 'active';
-}
-
-function getCalendarStateLabel(state: CalendarActivityState, count: number) {
-  if (state === 'free') return 'Свободно';
-  if (state === 'complete') return 'Завершено';
-  return count > 1 ? `В работе · ${count}` : 'В работе';
-}
-
-function getCalendarAssignmentSummary(currentAssignments: Assignment[], state: CalendarActivityState) {
-  if (!currentAssignments.length) return 'Можно взять это задание';
-  const labels = currentAssignments.map(assignmentLabel);
-  const visible = labels.slice(0, 2).join(', ');
-  const rest = labels.length > 2 ? ` и ещё ${labels.length - 2}` : '';
-  return `${state === 'complete' ? 'Завершили' : 'Занимаются'}: ${visible}${rest}`;
+function vacancyStatus(vacancy: Vacancy) {
+  if (vacancy.freeSlots <= 0) return { label: 'Мест нет', tone: 'full' } as const;
+  if (vacancy.freeSlots <= 2) return { label: `Осталось ${vacancy.freeSlots}`, tone: 'few' } as const;
+  return { label: `Свободно ${vacancy.freeSlots}`, tone: 'open' } as const;
 }
 
 export default function Page() {
-  const [activities, setActivities] = useState<Activity[]>(fallbackActivities());
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [selected, setSelected] = useState<Activity | null>(null);
-  const [name, setName] = useState('');
-  const [topicTitle, setTopicTitle] = useState('');
-  const [planned, setPlanned] = useState('');
-  const [submitAssignment, setSubmitAssignment] = useState('');
-  const [spent, setSpent] = useState('');
-  const [materialUrl, setMaterialUrl] = useState('');
-  const [comment, setComment] = useState('');
-  const [message, setMessage] = useState('');
-  const [claimPending, setClaimPending] = useState(false);
-  const [submitPending, setSubmitPending] = useState(false);
-  const claimPendingRef = useRef(false);
-  const submitPendingRef = useRef(false);
-  const claimRequestIdRef = useRef('');
+  const [filter, setFilter] = useState<(typeof categories)[number]>('Все добрые дела');
+  const [selected, setSelected] = useState<Vacancy | null>(null);
+  const [sent, setSent] = useState(false);
 
-  async function loadData() {
-    await fetch('/api/bootstrap-calendar', { method: 'POST' }).catch(() => null);
-    const [{ data: a }, { data: s }] = await Promise.all([
-      supabase.from('activities').select('*').order('sort_order'),
-      supabase.from('assignments').select('*').order('created_at', { ascending: false })
-    ]);
-    setActivities(((a && a.length) ? a : fallbackActivities()) as Activity[]);
-    setAssignments((s || []) as Assignment[]);
-  }
-
-  useEffect(() => {
-    loadData();
-    const channel = supabase
-      .channel('dobro-media-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' }, loadData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, loadData)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+  const calendarCells = useMemo(() => {
+    const year = 2026;
+    const monthIndex = 7;
+    const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+    const firstWeekDay = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay();
+    const mondayOffset = firstWeekDay === 0 ? 6 : firstWeekDay - 1;
+    return [
+      ...Array.from({ length: mondayOffset }, () => null),
+      ...Array.from({ length: daysInMonth }, (_, index) => index + 1)
+    ];
   }, []);
 
-  useEffect(() => {
-    claimRequestIdRef.current = '';
-  }, [selected?.id]);
+  const visibleVacancies = useMemo(
+    () => vacancies.filter(item => filter === 'Все добрые дела' || item.category === filter),
+    [filter]
+  );
 
-  const byDay = useMemo(() => {
-    const map = new Map<number, Activity[]>();
-    activities.filter(a => a.is_active).forEach(a => {
-      const list = map.get(a.day) || [];
-      list.push(a);
-      map.set(a.day, list);
-    });
-    return map;
-  }, [activities]);
-
-  const selectedAssignments = selected
-    ? assignments.filter(a => a.activity_id === selected.id && a.status !== 'Отменено')
-    : [];
-  const selectedSubmitAssignment = selectedAssignments.find(a => a.id === submitAssignment);
-  const selectedAdminComment = selectedSubmitAssignment?.admin_comment?.trim();
-  const selectedIsOwnTopic = selected?.type === 'd';
-
-  async function claimActivity() {
-    if (!selected) return;
-    if (claimPendingRef.current) return;
-    setMessage('');
-    if (!name.trim()) {
-      setMessage('Напиши имя и фамилию, чтобы взять активность.');
-      return;
-    }
-    if (selectedIsOwnTopic && !topicTitle.trim()) {
-      setMessage('Напиши название своей темы, например: Игры, Интервью, Летний двор.');
-      return;
-    }
-    if (selected.id.startsWith('start-')) {
-      await loadData();
-      setMessage('Календарь обновляется. Открой активность ещё раз и нажми кнопку повторно.');
-      return;
-    }
-    claimPendingRef.current = true;
-    setClaimPending(true);
-    claimRequestIdRef.current ||= createRequestId();
-
-    try {
-      const res = await fetch('/api/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          request_id: claimRequestIdRef.current,
-          activity_id: selected.id,
-          volunteer_name: name,
-          topic_title: selectedIsOwnTopic ? topicTitle : '',
-          planned_minutes: hoursToMinutes(planned, 1)
-        })
-      });
-      const json = await res.json();
-      if (!res.ok) setMessage(json.error || 'Не удалось взять активность. Попробуй ещё раз.');
-      else {
-        claimRequestIdRef.current = '';
-        setMessage(json.duplicate ? 'Активность уже была взята. Повтор не создан.' : 'Активность взята. Теперь она видна всем ребятам.');
-        setName('');
-        setTopicTitle('');
-        setPlanned('');
-        await loadData();
-      }
-    } catch {
-      setMessage('Не удалось получить ответ сервера. Нажми ещё раз — повторная заявка не создастся.');
-    } finally {
-      claimPendingRef.current = false;
-      setClaimPending(false);
-    }
+  function submitApplication(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSent(true);
   }
 
-  async function sendMaterial() {
-    if (submitPendingRef.current) return;
-    setMessage('');
-    if (!submitAssignment) {
-      setMessage('Сначала выбери свою запись в списке.');
-      return;
-    }
-
-    const spentHours = Number(String(spent || '').replace(',', '.'));
-    if (!Number.isFinite(spentHours) || spentHours <= 0) {
-      setMessage('Укажи потраченное время в часах, например: 1 или 1,5.');
-      return;
-    }
-
-    if (!materialUrl.trim()) {
-      setMessage('Добавь ссылку на материалы: фото, видео или документ.');
-      return;
-    }
-
-    submitPendingRef.current = true;
-    setSubmitPending(true);
-
-    try {
-      const res = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assignment_id: submitAssignment,
-          spent_minutes: Math.round(spentHours * 60),
-          material_url: materialUrl,
-          volunteer_comment: comment
-        })
-      });
-      const json = await res.json();
-      if (!res.ok) setMessage(json.error || 'Не удалось сдать материал. Попробуй ещё раз.');
-      else {
-        setMessage(json.duplicate ? 'Материал уже был отправлен. Повторное уведомление не создано.' : 'Материал отправлен на проверку Кустову Евгению Валерьевичу.');
-        setSubmitAssignment('');
-        setMaterialUrl('');
-        setComment('');
-        setSpent('');
-        await loadData();
-      }
-    } catch {
-      setMessage('Не удалось получить ответ сервера. Нажми ещё раз — повторное уведомление не отправится.');
-    } finally {
-      submitPendingRef.current = false;
-      setSubmitPending(false);
-    }
+  function openVacancy(vacancy: Vacancy) {
+    setSelected(vacancy);
+    setSent(false);
   }
 
   return (
     <>
-      <Header />
-      <main>
-        <section className="hero">
-          <div className="wrap hero-card">
-            <div>
-              <div className="kicker">Добро.Медиа</div>
-              <h1>Кабинет <span className="red">медиа-волонтёра</span></h1>
-              <p className="lead">Информационный и рабочий сайт для ребят, которые хотят попробовать себя в фото, видео, интервью, текстах, монтаже и подготовке материалов о событиях Первых Кемского муниципального округа.</p>
-              <div className="actions"><a className="btn primary" href="#calendar">Выбрать задание</a><a className="btn ghost" href="#workflow">Как это устроено</a></div>
-              <div className="facts"><div className="fact"><span>Период участия</span><b>8–31 июля 2026</b></div><div className="fact"><span>Формат</span><b>Очно-дистанционный</b></div><div className="fact"><span>Где</span><b>Кемский муниципальный округ</b></div></div>
-            </div>
-            <div className="hero-panel">
-              <h3>Главное правило</h3>
-              <p>Ребята самостоятельно снимают репортажи, пишут посты и монтируют короткие ролики. Готовые материалы отправляются Кустову Евгению Валерьевичу на проверку. Самостоятельно ничего не публикуем.</p>
-            </div>
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
+          <a className={styles.brand} href="#top" aria-label="БлагоТвори. Кемь">
+            <span className={styles.brandMark}>Б</span>
+            <span><b>БлагоТвори</b><small>Кемский округ</small></span>
+          </a>
+          <a className={styles.myButton} href="#how">Как участвовать</a>
+        </div>
+      </header>
+
+      <main id="top">
+        <section className={styles.intro}>
+          <div className={styles.wrap}>
+            <span className={styles.eyebrow}>Волонтёрские вакансии для детей и молодёжи</span>
+            <h1>Выбирай доброе дело.<br /><span>Помогай вместе с нами.</span></h1>
+            <p>Нажми на вакансию в календаре, прочитай условия и отправь заявку.</p>
           </div>
         </section>
 
-        <section className="section" id="about">
-          <div className="wrap">
-            <div className="head"><h2 className="title">Что такое <span className="red">Добро.Медиа</span></h2><p className="note">Это медиакоманда, которая помогает рассказывать о людях, событиях, добрых делах и летней жизни Движения Первых в Кемском округе.</p></div>
-            <div className="grid3">
-              <div className="card"><h3>Замечать важное</h3><p>Находить живые сюжеты: человек, событие, доброе дело, место, настроение, результат.</p></div>
-              <div className="card"><h3>Собирать материал</h3><p>Снимать фото и видео, брать короткие комментарии, уточнять факты, готовить черновики постов.</p></div>
-              <div className="card"><h3>Работать в команде</h3><p>Брать активности в календаре, видеть, кто что делает, и отправлять материалы на проверку.</p></div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section" id="roles">
-          <div className="wrap">
-            <div className="head"><h2 className="title">Что можно <span className="red">делать</span></h2><p className="note">Можно выбрать одно направление или пробовать разные роли.</p></div>
-            <div className="grid3">
-              <div className="card"><h3>Фотограф</h3><p>Снимает общий план, действия, эмоции, детали и финальный кадр.</p></div>
-              <div className="card"><h3>Видеограф</h3><p>Снимает короткие фрагменты для клипа или репортажа.</p></div>
-              <div className="card"><h3>Интервьюер</h3><p>Задаёт 2–3 простых вопроса и фиксирует настоящие ответы участников.</p></div>
-              <div className="card"><h3>Автор поста</h3><p>Собирает факты и пишет понятный, живой и честный текст.</p></div>
-              <div className="card"><h3>Монтажёр</h3><p>Собирает короткий ролик: начало, процесс, эмоции, детали, финал.</p></div>
-              <div className="card"><h3>Редактор материалов</h3><p>Проверяет, всё ли подписано: дата, место, участники, ссылки, комментарии.</p></div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section" id="workflow">
-          <div className="wrap">
-            <div className="head"><h2 className="title">Как <span className="red">работаем</span></h2><p className="note">Путь от выбора задания до проверки материала.</p></div>
-            <div className="steps">
-              <div className="step"><h3>Выбери активность</h3><p>Открой календарь, нажми на дату или задание и прочитай карточку-подсказку.</p></div>
-              <div className="step"><h3>Возьми в работу</h3><p>Укажи имя, тему для своего сюжета и планируемое время в часах.</p></div>
-              <div className="step"><h3>Собери материал</h3><p>Сними фото, видео, возьми комментарий, уточни дату, место и участников.</p></div>
-              <div className="step"><h3>Подготовь черновик</h3><p>Напиши пост или собери короткий ролик. Не придумывай факты и цитаты.</p></div>
-              <div className="step"><h3>Сдай на проверку</h3><p>Укажи затраченное время в часах, прикрепи ссылку на материалы и напиши, что получилось.</p></div>
-              <div className="step"><h3>Доработай</h3><p>Если будет комментарий, исправь материал и отправь обновлённую версию.</p></div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section" id="calendar">
-          <div className="wrap">
-            <div className="head"><h2 className="title">Календарь <span className="red">заданий</span></h2><p className="note">Нажми на активность внутри даты: откроется карточка с объяснением, заданием и подсказками.</p></div>
-            <div className="calendar-help">
-              <div className="calendar-help-copy"><b>Активности начинаются с 8 июля.</b><span>Занятые задания выделяются автоматически, как только кто-то берёт их в работу.</span></div>
-              <div className="calendar-legend" aria-label="Обозначения календаря">
-                <span><i className="legend-dot free"/>Свободно</span>
-                <span><i className="legend-dot active"/>В работе</span>
-                <span><i className="legend-dot complete"/>Завершено</span>
+        <section className={styles.calendarSection} aria-labelledby="calendar-title">
+          <div className={styles.wrap}>
+            <div className={styles.sectionHead}>
+              <div>
+                <span className={styles.sectionNumber}>01</span>
+                <h2 id="calendar-title">Календарь добрых дел</h2>
               </div>
+              <p>Август 2026 · демонстрационная версия</p>
             </div>
-            <div className="calendar">
-              <div className="cal-head"><div>Неделя</div>{weekDays.map(d => <div key={d}>{d}</div>)}</div>
-              {weeks.map(([label, days]) => (
-                <div className="cal-row" key={label}>
-                  <div className="week">{label}</div>
-                  {days.map((day, idx) => {
-                    const list = day ? byDay.get(day) || [] : [];
-                    return <div className={day && day >= 8 ? 'day' : 'day muted'} key={idx}>
-                      {day && <span className="num">{day}</span>}
-                      {list.map(item => {
-                        const currentAssignments = assignments.filter(a => a.activity_id === item.id && a.status !== 'Отменено');
-                        const activityState = getCalendarActivityState(currentAssignments);
-                        const stateLabel = getCalendarStateLabel(activityState, currentAssignments.length);
-                        const assignmentSummary = getCalendarAssignmentSummary(currentAssignments, activityState);
-                        return <button
-                          className={`activity-pill activity-pill-${activityState}`}
-                          key={item.id}
-                          onClick={() => { setSelected(item); setTopicTitle(''); setMessage(''); }}
-                          aria-label={`${item.title}. ${stateLabel}. ${assignmentSummary}`}
-                        >
-                          <span className="activity-pill-top"><span className={`tag ${item.type}`}>{item.tag}</span><span className={`calendar-state calendar-state-${activityState}`}>{stateLabel}</span></span>
-                          <b>{item.title}</b>
-                          <span className="activity-meta">{assignmentSummary}</span>
-                        </button>;
-                      })}
-                    </div>;
-                  })}
-                </div>
+
+            <div className={styles.filters} aria-label="Фильтр вакансий">
+              {categories.map(category => (
+                <button
+                  type="button"
+                  key={category}
+                  className={filter === category ? styles.filterActive : styles.filterButton}
+                  onClick={() => setFilter(category)}
+                >
+                  {category}
+                </button>
               ))}
             </div>
+
+            <div className={styles.calendar}>
+              <div className={styles.weekHeader}>
+                {weekDays.map(day => <div key={day}>{day}</div>)}
+              </div>
+              <div className={styles.monthGrid}>
+                {calendarCells.map((day, index) => {
+                  const items = day ? visibleVacancies.filter(item => item.day === day) : [];
+                  return (
+                    <div className={day ? styles.day : styles.dayEmpty} key={`${day ?? 'empty'}-${index}`}>
+                      {day && <span className={styles.dayNumber}>{day}</span>}
+                      {items.map(vacancy => {
+                        const status = vacancyStatus(vacancy);
+                        return (
+                          <button
+                            type="button"
+                            className={styles.vacancy}
+                            key={vacancy.id}
+                            onClick={() => openVacancy(vacancy)}
+                          >
+                            <span className={styles.vacancyCategory}>{vacancy.category}</span>
+                            <b>{vacancy.title}</b>
+                            <span>{vacancy.time} · {vacancy.hours} ч.</span>
+                            <em data-tone={status.tone}>{status.label}</em>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={styles.mobileList}>
+              {visibleVacancies.map(vacancy => {
+                const status = vacancyStatus(vacancy);
+                return (
+                  <button type="button" className={styles.mobileVacancy} key={vacancy.id} onClick={() => openVacancy(vacancy)}>
+                    <span className={styles.mobileDate}>{vacancy.day}<small>августа</small></span>
+                    <span className={styles.mobileVacancyCopy}>
+                      <small>{vacancy.category}</small>
+                      <b>{vacancy.title}</b>
+                      <span>{vacancy.time} · {vacancy.hours} ч. · {status.label}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {!visibleVacancies.length && (
+              <div className={styles.emptyState}>В этой категории пока нет вакансий. Попробуй выбрать другой фильтр.</div>
+            )}
           </div>
         </section>
 
-        <section className="section" id="templates">
-          <div className="wrap">
-            <div className="head"><h2 className="title">Шпаргалки <span className="red">медиа-волонтёра</span></h2><p className="note">Одна памятка на весь путь: от идеи и съёмки до текста, проверки и доработки.</p></div>
-            <div className="grid3">
-              <div className="card"><h3>С чего начать</h3><p>Ответь на вопросы: что произошло, где, когда, кто участвовал, почему это важно и что хочется показать другим.</p></div>
-              <div className="card"><h3>Что снять</h3><p>Фото: общий план, действие, эмоции, детали, финальный кадр. Видео: короткие фрагменты по 5–10 секунд, устойчивый телефон, хороший свет и звук.</p></div>
-              <div className="card"><h3>Что спросить</h3><p>Что произошло? Что запомнилось? Почему это важно? Что хочется пожелать другим ребятам?</p></div>
-            </div><br />
-            <div className="grid3">
-              <div className="card"><h3>Как писать</h3><p>Пиши просто, доброжелательно и по делу. Покажи пользу, участие ребят, команду, действие и результат.</p></div>
-              <div className="card"><h3>Проверь факты</h3><p>Дата, место, имена, название события и цифры должны быть точными. Если сомневаешься — напиши куратору, что нужно уточнить.</p></div>
-              <div className="card"><h3>Снимай уважительно</h3><p>Перед съёмкой людей спроси разрешение, особенно для крупного портрета. Не выбирай неудачные кадры, не снимай личные данные и не мешай событию.</p></div>
-            </div><br />
-            <div className="grid2">
-              <div className="check"><h3>Шаблон поста</h3><div className="template">Заголовок:{'\n'}Что произошло:{'\n'}Когда и где:{'\n'}Кто участвовал:{'\n'}Что делали:{'\n'}Почему это важно:{'\n'}Живой момент или цитата:{'\n'}Кого благодарим:{'\n'}Какие фото/видео есть:</div></div>
-              <div className="check"><h3>Перед отправкой</h3><ul className="tick-list"><li>Файлы открываются по ссылке.</li><li>Фото и видео подписаны понятно.</li><li>Тема и имя автора указаны.</li><li>Черновик текста приложен или написан в комментарии.</li><li>Вопросы к куратору написаны отдельно.</li></ul></div>
-            </div><br />
-            <div className="grid3">
-              <div className="card"><h3>Не публикуем сами</h3><p>Материалы сначала отправляются на проверку. Публикация возможна только после согласования.</p></div>
-              <div className="card"><h3>Не придумываем</h3><p>Факты, имена и цитаты должны быть настоящими. Если не уверен — лучше уточнить.</p></div>
-              <div className="card"><h3>Доработка — это нормально</h3><p>Если куратор вернул материал с комментарием, исправь текст, фото или ссылку и отправь обновлённую версию.</p></div>
+        <section className={styles.howSection} id="how" aria-labelledby="how-title">
+          <div className={styles.wrap}>
+            <div className={styles.sectionHead}>
+              <div>
+                <span className={styles.sectionNumber}>02</span>
+                <h2 id="how-title">Как всё работает</h2>
+              </div>
+              <p>Четыре простых шага</p>
+            </div>
+            <div className={styles.steps}>
+              <article><span>1</span><h3>Выбери дело</h3><p>Открой вакансию в календаре и внимательно прочитай условия.</p></article>
+              <article><span>2</span><h3>Отправь заявку</h3><p>Укажи имя и контакт. Мы сообщим, когда участие будет подтверждено.</p></article>
+              <article><span>3</span><h3>Помоги</h3><p>Приходи вовремя или выполни дистанционное задание по инструкции.</p></article>
+              <article><span>4</span><h3>Подтверди результат</h3><p>Отправь ссылку, фотографию или короткий отчёт. Организатор подтвердит часы.</p></article>
             </div>
           </div>
         </section>
 
-        <section className="section" id="hashtags">
-          <div className="wrap hashtag-box">
-            <span>#ДвижениеПервых10</span><span>#ПервыеКемь</span><span>#КемскийОкруг</span>
+        <section className={styles.guidesSection} aria-labelledby="guides-title">
+          <div className={styles.wrap}>
+            <div className={styles.sectionHead}>
+              <div>
+                <span className={styles.sectionNumber}>03</span>
+                <h2 id="guides-title">Памятки волонтёру</h2>
+              </div>
+              <p>Нажми на вопрос, чтобы увидеть ответ</p>
+            </div>
+            <div className={styles.guides}>
+              <details open>
+                <summary>Как записаться?</summary>
+                <p>Выбери вакансию, нажми «Стать волонтёром», укажи имя и контакт для связи. После отправки дождись подтверждения организатора.</p>
+              </details>
+              <details>
+                <summary>Как подтвердить доброе дело?</summary>
+                <p>Способ подтверждения указан в каждой вакансии. Это может быть ссылка на материал, фотография результата или отметка организатора о твоём присутствии.</p>
+              </details>
+              <details>
+                <summary>Как считаются часы?</summary>
+                <p>В вакансии указано примерное время. После выполнения организатор подтверждает фактически отработанные часы. Отдельно будет отмечено, внесены ли они на Добро.рф.</p>
+              </details>
+              <details>
+                <summary>Что делать, если не можешь прийти?</summary>
+                <p>Сообщи об этом заранее организатору. Тогда освободившееся место сможет занять другой волонтёр.</p>
+              </details>
+              <details>
+                <summary>Главные правила безопасности</summary>
+                <p>Выполняй только указанную работу, следуй инструкции взрослого, не уходи с площадки без предупреждения и сразу сообщай о плохом самочувствии.</p>
+              </details>
+              <details>
+                <summary>Можно ли публиковать фотографии?</summary>
+                <p>Фотографии людей можно делать и публиковать только с разрешения. Не снимай документы, личные данные и ситуации, которые могут поставить человека в неловкое положение.</p>
+              </details>
+            </div>
           </div>
         </section>
       </main>
-      <footer className="footer"><div className="wrap">Добро.Медиа · Кемский муниципальный округ</div></footer>
-      {selected && <div className="modal open">
-        <div className="modal-card">
-          <div className="modal-top">
-            <div><div className="modal-date">{selected.day} июля 2026</div><h3 className="modal-title">{selected.title}</h3></div>
-            <button className="modal-close" onClick={() => setSelected(null)}>×</button>
-          </div>
-          <div className="modal-body">
-            <div className="modal-block"><h4>О чём это</h4><p>{selected.description}</p></div>
-            <div className="modal-block"><h4>Твоё задание</h4><p>{selected.task}</p></div>
-            <div className="modal-block"><h4>Как делать</h4><p>{selected.how_to}</p></div>
-            <div className="modal-block"><h4>Что собрать</h4><p>{selected.collect}</p></div>
-            <div className="modal-block modal-wide"><h4>Что отправить</h4><p>{selected.send_to_admin}</p></div>
-            {selectedAssignments.length ? <div className="modal-block modal-wide"><h4>Кто взял активность</h4><div className="assignments">{selectedAssignments.map(a => {
-              const adminComment = a.admin_comment?.trim();
-              const topic = getAssignmentTopic(a);
-              return <div className={`assignment ${a.status === 'На доработке' ? 'needs-work' : ''}`} key={a.id}>
-                <div className="assignment-row"><b>{a.volunteer_name}</b><span className="status">{a.status}</span>{a.spent_minutes ? <span> · {minutesToHours(a.spent_minutes)} ч.</span> : null}</div>
-                {topic ? <div className="topic-note"><b>Тема</b><span>{topic}</span></div> : null}
-                {adminComment ? <div className="admin-comment"><strong>{a.status === 'На доработке' ? 'Что нужно доработать' : 'Комментарий администратора'}</strong><p>{adminComment}</p></div> : null}
-              </div>;
-            })}</div></div> : null}
-          </div>
-          <div className="form">
-            <h3>Взять активность</h3>
-            <label><b>Имя и фамилия</b><input className="input" value={name} onChange={e => { setName(e.target.value); claimRequestIdRef.current = ''; }} placeholder="Например: Иванова Анна" /></label>
-            {selectedIsOwnTopic ? <label><b>Название своей темы</b><input className="input" value={topicTitle} onChange={e => { setTopicTitle(e.target.value); claimRequestIdRef.current = ''; }} placeholder="Например: Игры, интервью, летний двор" /></label> : null}
-            <label><b>Планируемое время, часы</b><input className="input" value={planned} onChange={e => { setPlanned(e.target.value); claimRequestIdRef.current = ''; }} placeholder="Например: 1" type="number" step="0.5" /></label>
-            <button className="btn primary" onClick={claimActivity} disabled={claimPending}>{claimPending ? 'Отправляем…' : 'Взять активность'}</button>
-          </div>
-          <div className="form">
-            <h3>Сдать материал</h3>
-            <label><b>Кто сдаёт</b><select value={submitAssignment} onChange={e => setSubmitAssignment(e.target.value)}><option value="">Выбери свою запись</option>{selectedAssignments.map(a => <option key={a.id} value={a.id}>{assignmentLabel(a)} — {a.status}</option>)}</select></label>
-            {selectedAdminComment ? <div className="revision-note"><b>{selectedSubmitAssignment?.status === 'На доработке' ? 'Нужно доработать' : 'Комментарий администратора'}</b><p>{selectedAdminComment}</p></div> : null}
-            <label><b>Потраченное время, часы</b><input className="input" value={spent} onChange={e => setSpent(e.target.value)} placeholder="Например: 1,5" type="number" step="0.5" /></label>
-            <label><b>Ссылка на материалы</b><input className="input" value={materialUrl} onChange={e => setMaterialUrl(e.target.value)} placeholder="Обязательно: ссылка на фото, видео или документ" /></label>
-            <label><b>Комментарий</b><textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Что сделал(а), что приложено, что нужно проверить" /></label>
-            <button className="btn primary" onClick={sendMaterial} disabled={submitPending}>{submitPending ? 'Отправляем…' : 'Сдать на проверку'}</button>
-          </div>
-          {message && <p><b>{message}</b></p>}
+
+      <footer className={styles.footer}>
+        <div className={styles.wrap}>
+          <div><b>БлагоТвори. Кемь</b><span>Календарь волонтёрских вакансий Кемского муниципального округа</span></div>
+          <a href="/admin">Вход организатора</a>
         </div>
-      </div>}
+      </footer>
+
+      {selected && (
+        <div className={styles.modalBackdrop} role="presentation" onMouseDown={() => setSelected(null)}>
+          <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="vacancy-title" onMouseDown={event => event.stopPropagation()}>
+            <button className={styles.closeButton} type="button" onClick={() => setSelected(null)} aria-label="Закрыть">×</button>
+            <span className={styles.modalCategory}>{selected.category}</span>
+            <h2 id="vacancy-title">{selected.title}</h2>
+            <div className={styles.modalFacts}>
+              <div><span>Когда</span><b>{selected.day} августа, {selected.time}</b></div>
+              <div><span>Где</span><b>{selected.place}</b></div>
+              <div><span>Формат</span><b>{selected.format}</b></div>
+              <div><span>Возраст</span><b>{selected.age}</b></div>
+              <div><span>Время</span><b>примерно {selected.hours} ч.</b></div>
+              <div><span>Места</span><b>{selected.freeSlots} из {selected.slots} свободно</b></div>
+            </div>
+            <div className={styles.modalText}>
+              <h3>Что предстоит делать</h3>
+              <p>{selected.description}</p>
+              <ul>{selected.duties.map(item => <li key={item}>{item}</li>)}</ul>
+              <h3>Как подтвердить участие</h3>
+              <p>{selected.confirmation}</p>
+              <h3>Что взять с собой</h3>
+              <p>{selected.takeWithYou}</p>
+            </div>
+
+            {sent ? (
+              <div className={styles.successBox}>
+                <b>Заявка заполнена</b>
+                <p>Это демонстрационная версия. После подключения отдельной базы заявка будет сохраняться и появляться в кабинете организатора.</p>
+              </div>
+            ) : (
+              <form className={styles.applicationForm} onSubmit={submitApplication}>
+                <h3>Стать волонтёром</h3>
+                <label>Имя и фамилия<input name="name" required placeholder="Например: Анна Иванова" /></label>
+                <label>Контакт для связи<input name="contact" required placeholder="Телефон или ссылка на профиль" /></label>
+                <label className={styles.checkbox}><input type="checkbox" required /><span>Я прочитал(а) условия и смогу участвовать в указанное время.</span></label>
+                <button type="submit">Отправить заявку</button>
+                <small>Пока форма работает в режиме прототипа и не передаёт личные данные.</small>
+              </form>
+            )}
+          </section>
+        </div>
+      )}
     </>
   );
-}
-
-function Header() {
-  return <header className="top"><div className="wrap topin"><a className="brand" href="/"><div className="brand-word">Первые</div><div className="brand-line"/><div className="brand-sub">Добро.Медиа · кабинет медиа-волонтёра</div></a><nav className="nav"><a href="#about">О проекте</a><a href="#roles">Роли</a><a href="#workflow">Как работаем</a><a href="#calendar">Календарь</a><a href="#templates">Шпаргалки</a><a href="/admin">Администратор</a></nav></div></header>;
 }
