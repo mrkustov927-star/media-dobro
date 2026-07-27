@@ -6,10 +6,12 @@ import './calendar-status.css';
 import './calendar.css';
 import './pending.css';
 import './calendar-progress.css';
+import './participant-initials.css';
 import './admin-blagotvori/admin-polish.css';
 import CalendarProgressEnhancer from './CalendarProgressEnhancer';
 import DobroHoursNotice from './DobroHoursNotice';
 import VolunteerJourneyPortal from './VolunteerJourneyPortal';
+import ParticipantInitialsEnhancer from './ParticipantInitialsEnhancer';
 
 export const metadata: Metadata = {
   title: 'БлагоТвори. Кемь — календарь добрых дел',
@@ -23,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <DobroHoursNotice />
         {children}
         <VolunteerJourneyPortal />
+        <ParticipantInitialsEnhancer />
         <CalendarProgressEnhancer />
         <script
           dangerouslySetInnerHTML={{
