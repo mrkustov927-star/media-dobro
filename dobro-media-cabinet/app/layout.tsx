@@ -7,6 +7,7 @@ import './calendar.css';
 import './pending.css';
 import './calendar-progress.css';
 import CalendarProgressEnhancer from './CalendarProgressEnhancer';
+import DobroHoursNotice from './DobroHoursNotice';
 
 export const metadata: Metadata = {
   title: 'БлагоТвори. Кемь — календарь добрых дел',
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru">
       <body>
+        <DobroHoursNotice />
         {children}
         <CalendarProgressEnhancer />
         <script
