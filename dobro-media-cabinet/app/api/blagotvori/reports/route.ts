@@ -1,6 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBlagotvoriAdmin, isBlagotvoriConfigured } from '@/lib/blagotvori/supabaseAdmin';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export async function GET() {
+  if (!isBlagotvoriConfigured()) {
+    return NextResponse.json({ error: 'База БлагоТвори пока не подключена.' }, { status: 503 });
+  }
+
+  try {
+    const supabase = getBlagotvoriAdmin();
+    const { data, error } = await supabase
+      .from('bt_applications')
+      .select('vacancy:bt_vacancies(id,title,event_date,is_active)')
+      .not('status', 'in', '("Отменено","Не участвовал")');
+
+    if (error) throw error;
+
+    const unique = new Map<string, { id: string; title: string; event_date: string; is_active: boolean }>();
+    for (const row of data || []) {
+      const vacancy = Array.isArray(row.vacancy) ? row.vacancy[0] : row.vacancy;
+      if (vacancy?.id) unique.set(vacancy.id, vacancy);
+    }
+
+    const vacancies = Array.from(unique.values()).sort((a, b) => {
+      return b.event_date.localeCompare(a.event_date) || a.title.localeCompare(b.title, 'ru');
+    });
+
+    return NextResponse.json(
+      { vacancies },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+    );
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'Не удалось загрузить список добрых дел.' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!isBlagotvoriConfigured()) {
     return NextResponse.json({ error: 'База БлагоТвори пока не подключена.' }, { status: 503 });
