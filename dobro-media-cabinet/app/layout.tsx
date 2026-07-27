@@ -6,6 +6,7 @@ import './calendar-status.css';
 import './calendar.css';
 import './pending.css';
 import './calendar-progress.css';
+import './admin-blagotvori/admin-polish.css';
 import CalendarProgressEnhancer from './CalendarProgressEnhancer';
 import DobroHoursNotice from './DobroHoursNotice';
 
