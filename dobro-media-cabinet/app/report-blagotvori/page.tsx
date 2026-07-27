@@ -5,17 +5,28 @@ import styles from './report.module.css';
 
 type VacancyOption = { id: string; title: string; event_date: string; is_active: boolean };
 
+function formatDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+    .format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 export default function ReportBlagotvoriPage() {
   const [vacancies, setVacancies] = useState<VacancyOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingVacancies, setLoadingVacancies] = useState(true);
   const [message, setMessage] = useState('');
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    fetch('/api/blagotvori/vacancies', { cache: 'no-store' })
-      .then(response => response.json())
-      .then(json => setVacancies(Array.isArray(json.vacancies) ? json.vacancies : []))
-      .catch(() => setVacancies([]));
+    fetch(`/api/blagotvori/reports?t=${Date.now()}`, { cache: 'no-store' })
+      .then(async response => {
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || 'Не удалось загрузить список дел.');
+        setVacancies(Array.isArray(json.vacancies) ? json.vacancies : []);
+      })
+      .catch(error => setMessage(error?.message || 'Не удалось загрузить список дел.'))
+      .finally(() => setLoadingVacancies(false));
   }, []);
 
   async function submitReport(event: FormEvent<HTMLFormElement>) {
@@ -70,9 +81,13 @@ export default function ReportBlagotvoriPage() {
             <div className={styles.note}><b>Важно</b><p>Имя и контакт должны полностью совпадать с данными, которые вы указали при подаче заявки на выбранную активность.</p></div>
 
             <label>Какое доброе дело выполнено?
-              <select name="vacancy_id" required defaultValue="">
-                <option value="" disabled>Выберите вакансию</option>
-                {vacancies.map(vacancy => <option key={vacancy.id} value={vacancy.id}>{vacancy.title}</option>)}
+              <select name="vacancy_id" required defaultValue="" disabled={loadingVacancies || !vacancies.length}>
+                <option value="" disabled>{loadingVacancies ? 'Загружаем список…' : vacancies.length ? 'Выберите вакансию' : 'Подходящих заявок пока нет'}</option>
+                {vacancies.map(vacancy => (
+                  <option key={vacancy.id} value={vacancy.id}>
+                    {formatDate(vacancy.event_date)} — {vacancy.title}{vacancy.is_active ? '' : ' · завершено'}
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -91,7 +106,7 @@ export default function ReportBlagotvoriPage() {
 
             <label className={styles.check}><input type="checkbox" required /><span>Я отправляю достоверный отчёт и понимаю, что часы будут зачтены только после проверки организатором.</span></label>
 
-            <button type="submit" disabled={loading}>{loading ? 'Отправляем…' : 'Отправить отчёт'}</button>
+            <button type="submit" disabled={loading || loadingVacancies || !vacancies.length}>{loading ? 'Отправляем…' : 'Отправить отчёт'}</button>
             {message && <div className={styles.error}>{message}</div>}
           </form>
         )}
