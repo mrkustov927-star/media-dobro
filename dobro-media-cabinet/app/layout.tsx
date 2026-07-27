@@ -12,6 +12,7 @@ import CalendarProgressEnhancer from './CalendarProgressEnhancer';
 import DobroHoursNotice from './DobroHoursNotice';
 import VolunteerJourneyPortal from './VolunteerJourneyPortal';
 import ParticipantInitialsEnhancer from './ParticipantInitialsEnhancer';
+import ReportQuickLink from './ReportQuickLink';
 
 export const metadata: Metadata = {
   title: 'БлагоТвори. Кемь — календарь добрых дел',
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <VolunteerJourneyPortal />
         <ParticipantInitialsEnhancer />
         <CalendarProgressEnhancer />
+        <ReportQuickLink />
         <script
           dangerouslySetInnerHTML={{
             __html: `
