@@ -1,0 +1,194 @@
+:global(.vacancy-edit-actions) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e8eaf0;
+}
+
+:global(.vacancy-edit-actions button) {
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+:global(.vacancy-edit-actions button:first-child) {
+  flex: 1;
+  color: #fff;
+  background: #2859d4;
+  box-shadow: 0 8px 20px rgba(40, 89, 212, .2);
+}
+
+:global(.vacancy-edit-actions button:last-child) {
+  color: #596174;
+  background: #f0f2f6;
+}
+
+:global(.vacancy-edit-actions button:hover) {
+  transform: translateY(-1px);
+}
+
+:global(.vacancy-edit-actions button:first-child:hover) {
+  background: #1f4bbb;
+  box-shadow: 0 11px 25px rgba(40, 89, 212, .28);
+}
+
+:global(.vacancy-edit-actions button:last-child:hover) {
+  color: #9b2c2c;
+  background: #fff0ee;
+}
+
+[class*="createModal"] {
+  width: min(900px, calc(100% - 32px)) !important;
+  max-height: min(90vh, 860px) !important;
+  border-radius: 28px !important;
+  box-shadow: 0 35px 100px rgba(17, 28, 51, .28) !important;
+  scrollbar-width: thin;
+  scrollbar-color: #c9cfda transparent;
+}
+
+[class*="modalHead"] {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding: 26px 30px 20px !important;
+  border-bottom: 1px solid #e8eaf0;
+  background: rgba(255,255,255,.96);
+  backdrop-filter: blur(14px);
+}
+
+[class*="modalHead"] h2 {
+  margin-top: 5px !important;
+  font-size: clamp(30px, 4vw, 44px) !important;
+  letter-spacing: -.045em;
+}
+
+[class*="modalHead"] > button {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 13px !important;
+  color: #596174 !important;
+  background: #f0f2f6 !important;
+}
+
+[class*="wizardForm"] {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 17px 20px !important;
+  padding: 24px 30px 0 !important;
+}
+
+[class*="wizardForm"] > label {
+  padding: 14px;
+  border: 1px solid #e7eaf0;
+  border-radius: 16px;
+  background: #fafbfc;
+}
+
+[class*="wizardForm"] > label:first-child,
+[class*="wizardForm"] > label:nth-of-type(5),
+[class*="wizardForm"] > label:nth-of-type(6),
+[class*="wizardForm"] > label:nth-of-type(7),
+[class*="wizardForm"] > label:nth-of-type(9) {
+  grid-column: 1 / -1;
+}
+
+[class*="wizardForm"] [class*="twoColumns"] {
+  grid-column: 1 / -1;
+  padding: 18px;
+  border: 1px solid #e7eaf0;
+  border-radius: 18px;
+  background: #f7f9fc;
+}
+
+[class*="wizardForm"] input,
+[class*="wizardForm"] select,
+[class*="wizardForm"] textarea {
+  background: #fff !important;
+}
+
+[class*="wizardForm"] textarea {
+  line-height: 1.55;
+}
+
+[class*="wizardFooter"] {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  grid-column: 1 / -1;
+  margin: 8px -30px 0 !important;
+  padding: 18px 30px 22px !important;
+  border-top: 1px solid #e8eaf0;
+  background: rgba(255,255,255,.97);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 -12px 35px rgba(23,32,51,.07);
+}
+
+[class*="wizardFooter"] button {
+  min-height: 48px;
+  border-radius: 14px !important;
+}
+
+:global(.report-box) {
+  margin: 14px 0 18px;
+  padding: 16px 18px;
+  border: 1px solid #cddafe;
+  border-radius: 16px;
+  color: #24314f;
+  background: #f1f5ff;
+}
+
+:global(.report-box b) {
+  display: block;
+  margin-bottom: 7px;
+  color: #2859d4;
+}
+
+:global(.report-box p) {
+  margin: 0 0 9px;
+  line-height: 1.55;
+}
+
+:global(.report-box a) {
+  color: #2859d4;
+  font-weight: 850;
+}
+
+@media (max-width: 720px) {
+  :global(.vacancy-edit-actions) {
+    flex-direction: column;
+  }
+
+  :global(.vacancy-edit-actions button) {
+    width: 100%;
+  }
+
+  [class*="createModal"] {
+    width: 100% !important;
+    max-height: 94vh !important;
+    border-radius: 24px 24px 0 0 !important;
+  }
+
+  [class*="wizardForm"] {
+    grid-template-columns: 1fr;
+    padding: 18px 18px 0 !important;
+  }
+
+  [class*="wizardForm"] > label,
+  [class*="wizardForm"] [class*="twoColumns"] {
+    grid-column: 1;
+  }
+
+  [class*="wizardFooter"] {
+    margin-left: -18px !important;
+    margin-right: -18px !important;
+    padding: 15px 18px 18px !important;
+  }
+}
