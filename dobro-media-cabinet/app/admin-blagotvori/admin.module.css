@@ -99,7 +99,10 @@
   margin-top: 16px;
 }
 
-button:disabled {
+.loginCard button:disabled,
+.vacancyForm > button:disabled,
+.applicationCard > button:disabled,
+.headerActions button:disabled {
   opacity: 0.55;
   cursor: wait;
 }
