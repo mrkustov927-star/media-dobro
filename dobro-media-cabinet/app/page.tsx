@@ -14,6 +14,14 @@ const categories: Array<'Все добрые дела' | VacancyCategory> = [
   'Дистанционные задания'
 ];
 
+const categoryMeta: Record<VacancyCategory, { icon: string; short: string }> = {
+  'Помощь людям': { icon: '❤', short: 'Людям' },
+  'Природа и животные': { icon: '🌿', short: 'Природе' },
+  'Помощь на мероприятиях': { icon: '🎪', short: 'События' },
+  'Медиа': { icon: '📷', short: 'Медиа' },
+  'Дистанционные задания': { icon: '💻', short: 'Из дома' }
+};
+
 const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 function dateParts(value: string) {
@@ -48,6 +56,16 @@ function vacancyStatus(vacancy: Vacancy) {
   if (vacancy.free_slots <= 0) return { label: 'Мест нет', tone: 'full' } as const;
   if (vacancy.free_slots <= 2) return { label: `Осталось ${vacancy.free_slots}`, tone: 'few' } as const;
   return { label: `Свободно ${vacancy.free_slots}`, tone: 'open' } as const;
+}
+
+function formatEventDate(value: string) {
+  const { year, month, day } = dateParts(value);
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' })
+    .format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function categoryIcon(category: (typeof categories)[number]) {
+  return category === 'Все добрые дела' ? '✨' : categoryMeta[category].icon;
 }
 
 export default function Page() {
@@ -86,6 +104,21 @@ export default function Page() {
     return () => { cancelled = true; };
   }, []);
 
+  const activeVacancies = useMemo(
+    () => vacancies.filter(item => item.is_active),
+    [vacancies]
+  );
+
+  const featuredVacancies = useMemo(
+    () => activeVacancies.slice(0, 4),
+    [activeVacancies]
+  );
+
+  const totalFreeSlots = useMemo(
+    () => activeVacancies.reduce((sum, item) => sum + Math.max(0, item.free_slots), 0),
+    [activeVacancies]
+  );
+
   const calendarBase = useMemo(() => {
     const first = vacancies[0]?.event_date || '2026-08-01';
     const { year, month } = dateParts(first);
@@ -112,7 +145,8 @@ export default function Page() {
 
   const visibleVacancies = useMemo(
     () => vacancies.filter(item => {
-      const sameMonth = dateParts(item.event_date).month === calendarBase.month && dateParts(item.event_date).year === calendarBase.year;
+      const parts = dateParts(item.event_date);
+      const sameMonth = parts.month === calendarBase.month && parts.year === calendarBase.year;
       const sameCategory = filter === 'Все добрые дела' || item.category === filter;
       return sameMonth && sameCategory && item.is_active;
     }),
@@ -163,6 +197,13 @@ export default function Page() {
     setFormMessage('');
   }
 
+  function openSurpriseVacancy() {
+    const available = activeVacancies.filter(item => item.free_slots > 0);
+    if (!available.length) return;
+    const item = available[Math.floor(Math.random() * available.length)];
+    openVacancy(item);
+  }
+
   return (
     <>
       <header className={styles.header}>
@@ -171,16 +212,77 @@ export default function Page() {
             <span className={styles.brandMark}>Б</span>
             <span><b>БлагоТвори</b><small>Кемский округ</small></span>
           </a>
-          <a className={styles.myButton} href="#how">Как участвовать</a>
+          <div className={styles.headerLinks}>
+            <a href="#good-deeds">Добрые дела</a>
+            <a className={styles.myButton} href="#how">Как участвовать</a>
+          </div>
         </div>
       </header>
 
       <main id="top">
         <section className={styles.intro}>
+          <div className={`${styles.wrap} ${styles.introGrid}`}>
+            <div className={styles.heroCopy}>
+              <span className={styles.eyebrow}>Добрые дела рядом с тобой</span>
+              <h1>Твоё время<br /><span>может изменить чей-то день.</span></h1>
+              <p>Выбери понятную задачу, познакомься с хорошими людьми и сделай Кемский округ чуть добрее.</p>
+              <div className={styles.heroActions}>
+                <a className={styles.primaryAction} href="#good-deeds">Найти доброе дело</a>
+                <button className={styles.secondaryAction} type="button" onClick={openSurpriseVacancy} disabled={!activeVacancies.length}>Удиви меня ✨</button>
+              </div>
+              <div className={styles.heroStats}>
+                <div><b>{activeVacancies.length}</b><span>активных дел</span></div>
+                <div><b>{totalFreeSlots}</b><span>свободных мест</span></div>
+                <div><b>2 минуты</b><span>чтобы записаться</span></div>
+              </div>
+            </div>
+
+            <aside className={styles.heroVisual} aria-label="Ближайшие добрые дела">
+              <div className={styles.heroVisualHead}>
+                <span className={styles.pulse}></span>
+                <b>Можно присоединиться сейчас</b>
+              </div>
+              <div className={styles.heroMiniList}>
+                {featuredVacancies.slice(0, 3).map(vacancy => (
+                  <button type="button" className={styles.heroMiniCard} key={vacancy.id} onClick={() => openVacancy(vacancy)}>
+                    <span className={styles.miniDate}><b>{dateParts(vacancy.event_date).day}</b><small>{monthLabel.split(' ')[0].slice(0, 3)}</small></span>
+                    <span className={styles.miniInfo}><small>{categoryMeta[vacancy.category].icon} {categoryMeta[vacancy.category].short}</small><b>{vacancy.title}</b><em>{timeRange(vacancy)} · {vacancyStatus(vacancy).label}</em></span>
+                    <span className={styles.miniArrow}>→</span>
+                  </button>
+                ))}
+              </div>
+              <p>Не нужно быть профессионалом. Главное — желание помочь.</p>
+            </aside>
+          </div>
+        </section>
+
+        <section className={styles.nearestSection} id="good-deeds" aria-labelledby="nearest-title">
           <div className={styles.wrap}>
-            <span className={styles.eyebrow}>Волонтёрские вакансии для детей и молодёжи</span>
-            <h1>Выбирай доброе дело.<br /><span>Помогай вместе с нами.</span></h1>
-            <p>Нажми на вакансию в календаре, прочитай условия и отправь заявку.</p>
+            <div className={styles.sectionHead}>
+              <div>
+                <span className={styles.sectionNumber}>01</span>
+                <h2 id="nearest-title">Выбирай по настроению</h2>
+              </div>
+              <p>Ближайшие возможности помочь</p>
+            </div>
+
+            <div className={styles.nearestGrid}>
+              {featuredVacancies.map(vacancy => {
+                const status = vacancyStatus(vacancy);
+                return (
+                  <button type="button" className={styles.nearestCard} key={vacancy.id} onClick={() => openVacancy(vacancy)} data-category={vacancy.category}>
+                    <span className={styles.nearestTop}>
+                      <span className={styles.categoryIcon}>{categoryMeta[vacancy.category].icon}</span>
+                      <span className={styles.nearestDate}>{formatEventDate(vacancy.event_date)}<small>{timeRange(vacancy)}</small></span>
+                    </span>
+                    <small className={styles.nearestCategory}>{vacancy.category}</small>
+                    <b>{vacancy.title}</b>
+                    <p>{vacancy.description}</p>
+                    <span className={styles.nearestBottom}><em data-tone={status.tone}>{status.label}</em><strong>Подробнее →</strong></span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </section>
 
@@ -188,11 +290,13 @@ export default function Page() {
           <div className={styles.wrap}>
             <div className={styles.sectionHead}>
               <div>
-                <span className={styles.sectionNumber}>01</span>
+                <span className={styles.sectionNumber}>02</span>
                 <h2 id="calendar-title">Календарь добрых дел</h2>
               </div>
               <p>{monthLabel}{dataMode === 'demo' ? ' · демонстрационный режим' : ''}</p>
             </div>
+
+            <div className={styles.calendarTip}>Нажми на карточку в календаре — откроются условия и быстрая запись.</div>
 
             <div className={styles.filters} aria-label="Фильтр вакансий">
               {categories.map(category => (
@@ -202,7 +306,7 @@ export default function Page() {
                   className={filter === category ? styles.filterActive : styles.filterButton}
                   onClick={() => setFilter(category)}
                 >
-                  {category}
+                  <span>{categoryIcon(category)}</span>{category}
                 </button>
               ))}
             </div>
@@ -227,8 +331,9 @@ export default function Page() {
                             className={styles.vacancy}
                             key={vacancy.id}
                             onClick={() => openVacancy(vacancy)}
+                            data-category={vacancy.category}
                           >
-                            <span className={styles.vacancyCategory}>{vacancy.category}</span>
+                            <span className={styles.vacancyCategory}>{categoryMeta[vacancy.category].icon} {vacancy.category}</span>
                             <b>{vacancy.title}</b>
                             <span>{timeRange(vacancy)} · {hoursLabel(vacancy.estimated_minutes)} ч.</span>
                             <em data-tone={status.tone}>{status.label}</em>
@@ -248,7 +353,7 @@ export default function Page() {
                   <button type="button" className={styles.mobileVacancy} key={vacancy.id} onClick={() => openVacancy(vacancy)}>
                     <span className={styles.mobileDate}>{dateParts(vacancy.event_date).day}<small>{monthLabel.split(' ')[0].toLowerCase()}</small></span>
                     <span className={styles.mobileVacancyCopy}>
-                      <small>{vacancy.category}</small>
+                      <small>{categoryMeta[vacancy.category].icon} {vacancy.category}</small>
                       <b>{vacancy.title}</b>
                       <span>{timeRange(vacancy)} · {hoursLabel(vacancy.estimated_minutes)} ч. · {status.label}</span>
                     </span>
@@ -267,16 +372,16 @@ export default function Page() {
           <div className={styles.wrap}>
             <div className={styles.sectionHead}>
               <div>
-                <span className={styles.sectionNumber}>02</span>
-                <h2 id="how-title">Как всё работает</h2>
+                <span className={styles.sectionNumber}>03</span>
+                <h2 id="how-title">От выбора до доброго дела</h2>
               </div>
               <p>Четыре простых шага</p>
             </div>
             <div className={styles.steps}>
-              <article><span>1</span><h3>Выбери дело</h3><p>Открой вакансию в календаре и внимательно прочитай условия.</p></article>
-              <article><span>2</span><h3>Отправь заявку</h3><p>Укажи имя и контакт. Мы сообщим, когда участие будет подтверждено.</p></article>
-              <article><span>3</span><h3>Помоги</h3><p>Приходи вовремя или выполни дистанционное задание по инструкции.</p></article>
-              <article><span>4</span><h3>Подтверди результат</h3><p>Отправь ссылку, фотографию или короткий отчёт. Организатор подтвердит часы.</p></article>
+              <article><span>👀</span><h3>Выбери</h3><p>Посмотри карточки и найди дело, которое подходит по времени и настроению.</p></article>
+              <article><span>✍️</span><h3>Запишись</h3><p>Оставь имя и контакт. Это занимает меньше двух минут.</p></article>
+              <article><span>🤝</span><h3>Помоги</h3><p>Приходи на место или выполни дистанционное задание по инструкции.</p></article>
+              <article><span>⭐</span><h3>Получи часы</h3><p>Организатор подтвердит результат и фактически отработанное время.</p></article>
             </div>
           </div>
         </section>
@@ -285,14 +390,14 @@ export default function Page() {
           <div className={styles.wrap}>
             <div className={styles.sectionHead}>
               <div>
-                <span className={styles.sectionNumber}>03</span>
-                <h2 id="guides-title">Памятки волонтёру</h2>
+                <span className={styles.sectionNumber}>04</span>
+                <h2 id="guides-title">Есть вопросы?</h2>
               </div>
-              <p>Нажми на вопрос, чтобы увидеть ответ</p>
+              <p>Ответы без сложных правил</p>
             </div>
             <div className={styles.guides}>
               <details open><summary>Как записаться?</summary><p>Выбери вакансию, нажми «Стать волонтёром», укажи имя и контакт для связи. После отправки дождись подтверждения организатора.</p></details>
-              <details><summary>Как подтвердить доброе дело?</summary><p>Способ подтверждения указан в каждой вакансии. Это может быть ссылка на материал, фотография результата или отметка организатора о твоём присутствии.</p></details>
+              <details><summary>Как подтвердить доброе дело?</summary><p>Способ указан в карточке: это может быть отметка организатора, фотография, ссылка или короткий отчёт.</p></details>
               <details><summary>Как считаются часы?</summary><p>В вакансии указано примерное время. После выполнения организатор подтверждает фактически отработанные часы. Отдельно будет отмечено, внесены ли они на Добро.рф.</p></details>
               <details><summary>Что делать, если не можешь прийти?</summary><p>Сообщи об этом заранее организатору. Тогда освободившееся место сможет занять другой волонтёр.</p></details>
               <details><summary>Главные правила безопасности</summary><p>Выполняй только указанную работу, следуй инструкции взрослого, не уходи с площадки без предупреждения и сразу сообщай о плохом самочувствии.</p></details>
@@ -313,10 +418,10 @@ export default function Page() {
         <div className={styles.modalBackdrop} role="presentation" onMouseDown={() => setSelected(null)}>
           <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="vacancy-title" onMouseDown={event => event.stopPropagation()}>
             <button className={styles.closeButton} type="button" onClick={() => setSelected(null)} aria-label="Закрыть">×</button>
-            <span className={styles.modalCategory}>{selected.category}</span>
+            <span className={styles.modalCategory}>{categoryMeta[selected.category].icon} {selected.category}</span>
             <h2 id="vacancy-title">{selected.title}</h2>
             <div className={styles.modalFacts}>
-              <div><span>Когда</span><b>{dateParts(selected.event_date).day} {monthLabel.split(' ')[0].toLowerCase()}, {timeRange(selected)}</b></div>
+              <div><span>Когда</span><b>{formatEventDate(selected.event_date)}, {timeRange(selected)}</b></div>
               <div><span>Где</span><b>{selected.place}</b></div>
               <div><span>Формат</span><b>{selected.format}</b></div>
               <div><span>Возраст</span><b>{ageLabel(selected)}</b></div>
@@ -326,7 +431,7 @@ export default function Page() {
             <div className={styles.modalText}>
               <h3>Что предстоит делать</h3>
               <p>{selected.description}</p>
-              <ul>{selected.duties.map(item => <li key={item}>{item}</li>)}</ul>
+              {!!selected.duties.length && <ul>{selected.duties.map(item => <li key={item}>{item}</li>)}</ul>}
               <h3>Как подтвердить участие</h3>
               <p>{selected.confirmation_text}</p>
               <h3>Что взять с собой</h3>
@@ -336,18 +441,19 @@ export default function Page() {
 
             {sent ? (
               <div className={styles.successBox}>
-                <b>Заявка отправлена</b>
+                <b>Заявка отправлена 🎉</b>
                 <p>Организатор увидит её в кабинете и свяжется с тобой после проверки.</p>
               </div>
             ) : selected.free_slots <= 0 ? (
               <div className={styles.successBox}><b>Свободных мест нет</b><p>Выбери другое доброе дело в календаре.</p></div>
             ) : (
               <form className={styles.applicationForm} onSubmit={submitApplication}>
-                <h3>Стать волонтёром</h3>
+                <h3>Присоединиться к доброму делу</h3>
+                <p className={styles.formLead}>Два поля — и заявка у организатора.</p>
                 <label>Имя и фамилия<input name="name" required placeholder="Например: Анна Иванова" /></label>
                 <label>Контакт для связи<input name="contact" required placeholder="Телефон или ссылка на профиль" /></label>
                 <label className={styles.checkbox}><input type="checkbox" required /><span>Я прочитал(а) условия и смогу участвовать в указанное время.</span></label>
-                <button type="submit" disabled={sending}>{sending ? 'Отправляем…' : 'Отправить заявку'}</button>
+                <button type="submit" disabled={sending}>{sending ? 'Отправляем…' : 'Я хочу помочь'}</button>
                 {formMessage && <small>{formMessage}</small>}
                 {!formMessage && <small>{dataMode === 'live' ? 'Заявка появится в кабинете организатора.' : 'Пока работает демонстрационный режим: отдельная база ещё не подключена.'}</small>}
               </form>
