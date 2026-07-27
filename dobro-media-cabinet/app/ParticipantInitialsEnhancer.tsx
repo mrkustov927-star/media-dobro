@@ -23,48 +23,75 @@ export default function ParticipantInitialsEnhancer() {
   useEffect(() => {
     let stopped = false;
     let observer: MutationObserver | null = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let latestVacancies: PublicVacancy[] = [];
 
-    async function enhance() {
-      try {
-        const response = await fetch('/api/blagotvori/vacancies', { cache: 'no-store' });
-        if (!response.ok) return;
-        const json = await response.json();
-        const vacancies: PublicVacancy[] = Array.isArray(json.vacancies) ? json.vacancies : [];
-        if (stopped) return;
+    function apply() {
+      if (stopped) return;
 
-        const apply = () => {
-          const candidates = Array.from(document.querySelectorAll('button, article'));
+      const candidates = Array.from(document.querySelectorAll<HTMLElement>('button, article'));
+      const titleMap = new Map(latestVacancies.map(vacancy => [vacancy.title, vacancy]));
 
-          for (const vacancy of vacancies) {
-            const label = participantText(vacancy);
-            if (!label) continue;
+      document.querySelectorAll<HTMLElement>('[data-participant-initials]').forEach(badge => {
+        const title = badge.dataset.vacancyTitle || '';
+        const vacancy = titleMap.get(title);
+        const label = vacancy ? participantText(vacancy) : '';
+        if (!label) badge.remove();
+        else badge.textContent = label;
+      });
 
-            for (const element of candidates) {
-              const text = element.textContent || '';
-              if (!text.includes(vacancy.title)) continue;
-              if (element.querySelector('[data-participant-initials]')) continue;
+      for (const vacancy of latestVacancies) {
+        const label = participantText(vacancy);
+        if (!label) continue;
 
-              const badge = document.createElement('span');
-              badge.setAttribute('data-participant-initials', 'true');
-              badge.className = 'participant-initials-badge';
-              badge.textContent = label;
-              element.appendChild(badge);
-            }
+        for (const element of candidates) {
+          const text = element.textContent || '';
+          if (!text.includes(vacancy.title)) continue;
+
+          const existing = element.querySelector<HTMLElement>(`[data-participant-initials][data-vacancy-id="${vacancy.id}"]`);
+          if (existing) {
+            existing.textContent = label;
+            continue;
           }
-        };
 
-        apply();
-        observer = new MutationObserver(apply);
-        observer.observe(document.body, { childList: true, subtree: true });
-      } catch {
-        // Публичная страница остаётся работоспособной даже без дополнительного индикатора.
+          const badge = document.createElement('span');
+          badge.setAttribute('data-participant-initials', 'true');
+          badge.setAttribute('data-vacancy-id', vacancy.id);
+          badge.setAttribute('data-vacancy-title', vacancy.title);
+          badge.className = 'participant-initials-badge';
+          badge.textContent = label;
+
+          const footer = element.querySelector('[class*="nearestBottom"], [class*="vacancyMeta"], em[data-tone]');
+          if (footer?.parentElement === element) element.insertBefore(badge, footer);
+          else element.appendChild(badge);
+        }
       }
     }
 
-    enhance();
+    async function refresh() {
+      try {
+        const response = await fetch(`/api/blagotvori/vacancies?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (!response.ok) return;
+        const json = await response.json();
+        latestVacancies = Array.isArray(json.vacancies) ? json.vacancies : [];
+        apply();
+      } catch {
+        // Основной календарь продолжает работать даже без дополнительного индикатора.
+      }
+    }
+
+    refresh();
+    timer = setInterval(refresh, 15000);
+    observer = new MutationObserver(apply);
+    observer.observe(document.body, { childList: true, subtree: true });
+
     return () => {
       stopped = true;
       observer?.disconnect();
+      if (timer) clearInterval(timer);
     };
   }, []);
 
