@@ -1,0 +1,23 @@
+.participant-initials-badge {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 5px 8px;
+  border: 1px solid rgba(40, 89, 212, 0.16);
+  border-radius: 999px;
+  color: #2859d4;
+  background: #eef3ff;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: left;
+}
+
+@media (max-width: 720px) {
+  .participant-initials-badge {
+    margin-top: 6px;
+    font-size: 9px;
+  }
+}
