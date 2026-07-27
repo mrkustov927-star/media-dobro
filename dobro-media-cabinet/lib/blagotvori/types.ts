@@ -34,6 +34,7 @@ export type Vacancy = {
   estimated_minutes: number;
   slots: number;
   free_slots: number;
+  occupied_slots?: number;
   min_age: number | null;
   max_age: number | null;
   format: VacancyFormat;
