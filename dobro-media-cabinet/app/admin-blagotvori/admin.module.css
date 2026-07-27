@@ -1,0 +1,397 @@
+.page,
+.loginPage {
+  min-height: 100vh;
+  color: #13213a;
+  background: #f4f7fb;
+}
+
+.page {
+  padding: 28px;
+}
+
+.loginPage {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.loginCard {
+  width: min(470px, 100%);
+  padding: 34px;
+  border: 1px solid #dfe5ef;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(20, 42, 78, 0.12);
+}
+
+.backLink {
+  display: inline-flex;
+  margin-bottom: 24px;
+  color: #1463d6;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.kicker {
+  display: inline-flex;
+  padding: 7px 11px;
+  border-radius: 999px;
+  color: #1463d6;
+  background: #edf4ff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.loginCard h1,
+.header h1 {
+  margin: 14px 0 10px;
+  letter-spacing: -0.035em;
+}
+
+.loginCard p {
+  color: #667085;
+  line-height: 1.55;
+}
+
+.loginCard label,
+.vacancyForm label,
+.applicationGrid label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.loginCard input,
+.vacancyForm input,
+.vacancyForm select,
+.vacancyForm textarea,
+.applicationGrid input,
+.applicationGrid select,
+.applicationGrid textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  color: #13213a;
+  background: #fff;
+  font: inherit;
+}
+
+.loginCard button,
+.vacancyForm > button,
+.applicationCard > button,
+.headerActions button {
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  background: #ed1c24;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.loginCard button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.alert,
+.notice {
+  margin-top: 16px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  color: #9b1c1c;
+  background: #feecec;
+  font-weight: 750;
+}
+
+.header {
+  width: min(1180px, 100%);
+  margin: 0 auto 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.header h1 {
+  margin-bottom: 0;
+  font-size: clamp(32px, 5vw, 54px);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.headerActions a,
+.headerActions button {
+  padding: 11px 15px;
+  text-decoration: none;
+}
+
+.headerActions a {
+  border-radius: 12px;
+  color: #1463d6;
+  background: #edf4ff;
+  font-weight: 850;
+}
+
+.headerActions button {
+  background: #13213a;
+}
+
+.notice {
+  width: min(1180px, 100%);
+  margin: 0 auto 18px;
+  color: #0b6841;
+  background: #ecfbf5;
+}
+
+.stats {
+  width: min(1180px, 100%);
+  margin: 0 auto 22px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stats article {
+  padding: 19px;
+  border: 1px solid #dfe5ef;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.stats span,
+.stats b {
+  display: block;
+}
+
+.stats span {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.stats b {
+  margin-top: 7px;
+  font-size: 30px;
+}
+
+.panel {
+  width: min(1180px, 100%);
+  margin: 0 auto 24px;
+  padding: 24px;
+  box-sizing: border-box;
+  border: 1px solid #dfe5ef;
+  border-radius: 22px;
+  background: #fff;
+}
+
+.panelHead {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.panelHead > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.panelHead > div > span {
+  width: 37px;
+  height: 37px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #fff;
+  background: #1463d6;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.panelHead h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.panelHead p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.vacancyForm {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.wide,
+.vacancyForm > button {
+  grid-column: 1 / -1;
+}
+
+.vacancyForm textarea,
+.applicationGrid textarea {
+  resize: vertical;
+}
+
+.vacancyForm > button {
+  min-height: 49px;
+}
+
+.applicationList {
+  display: grid;
+  gap: 14px;
+}
+
+.applicationCard {
+  padding: 18px;
+  border: 1px solid #dfe5ef;
+  border-radius: 18px;
+  background: #f9fbfe;
+}
+
+.applicationTitle {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.applicationTitle b,
+.applicationTitle a,
+.applicationTitle span {
+  display: block;
+}
+
+.applicationTitle b {
+  font-size: 19px;
+}
+
+.applicationTitle a {
+  margin-top: 4px;
+  color: #1463d6;
+  font-size: 13px;
+}
+
+.applicationTitle > span {
+  max-width: 50%;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 750;
+  text-align: right;
+}
+
+.applicationGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 12px;
+}
+
+.comment {
+  grid-column: auto;
+}
+
+.checks {
+  margin: 14px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.applicationCard > button {
+  min-height: 42px;
+  padding: 9px 15px;
+}
+
+.empty {
+  padding: 28px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  color: #667085;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vacancyForm {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .applicationGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .comment {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 16px;
+  }
+
+  .header,
+  .panelHead,
+  .applicationTitle {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .headerActions {
+    width: 100%;
+  }
+
+  .headerActions a,
+  .headerActions button {
+    flex: 1;
+    text-align: center;
+  }
+
+  .stats,
+  .vacancyForm,
+  .applicationGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .wide,
+  .comment,
+  .vacancyForm > button {
+    grid-column: auto;
+  }
+
+  .panel {
+    padding: 17px;
+  }
+
+  .panelHead p,
+  .applicationTitle > span {
+    max-width: none;
+    text-align: left;
+  }
+}
