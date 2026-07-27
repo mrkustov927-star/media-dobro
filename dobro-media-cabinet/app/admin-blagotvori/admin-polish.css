@@ -1,4 +1,4 @@
-:global(.vacancy-edit-actions) {
+.vacancy-edit-actions {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -7,7 +7,7 @@
   border-top: 1px solid #e8eaf0;
 }
 
-:global(.vacancy-edit-actions button) {
+.vacancy-edit-actions button {
   min-height: 40px;
   padding: 9px 14px;
   border: 0;
@@ -19,28 +19,28 @@
   transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
 }
 
-:global(.vacancy-edit-actions button:first-child) {
+.vacancy-edit-actions button:first-child {
   flex: 1;
   color: #fff;
   background: #2859d4;
   box-shadow: 0 8px 20px rgba(40, 89, 212, .2);
 }
 
-:global(.vacancy-edit-actions button:last-child) {
+.vacancy-edit-actions button:last-child {
   color: #596174;
   background: #f0f2f6;
 }
 
-:global(.vacancy-edit-actions button:hover) {
+.vacancy-edit-actions button:hover {
   transform: translateY(-1px);
 }
 
-:global(.vacancy-edit-actions button:first-child:hover) {
+.vacancy-edit-actions button:first-child:hover {
   background: #1f4bbb;
   box-shadow: 0 11px 25px rgba(40, 89, 212, .28);
 }
 
-:global(.vacancy-edit-actions button:last-child:hover) {
+.vacancy-edit-actions button:last-child:hover {
   color: #9b2c2c;
   background: #fff0ee;
 }
@@ -136,7 +136,7 @@
   border-radius: 14px !important;
 }
 
-:global(.report-box) {
+.report-box {
   margin: 14px 0 18px;
   padding: 16px 18px;
   border: 1px solid #cddafe;
@@ -145,28 +145,28 @@
   background: #f1f5ff;
 }
 
-:global(.report-box b) {
+.report-box b {
   display: block;
   margin-bottom: 7px;
   color: #2859d4;
 }
 
-:global(.report-box p) {
+.report-box p {
   margin: 0 0 9px;
   line-height: 1.55;
 }
 
-:global(.report-box a) {
+.report-box a {
   color: #2859d4;
   font-weight: 850;
 }
 
 @media (max-width: 720px) {
-  :global(.vacancy-edit-actions) {
+  .vacancy-edit-actions {
     flex-direction: column;
   }
 
-  :global(.vacancy-edit-actions button) {
+  .vacancy-edit-actions button {
     width: 100%;
   }
 
