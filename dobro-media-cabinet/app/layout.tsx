@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import './globals.css';
 import './extra.css';
 import './vk.css';
@@ -6,6 +7,11 @@ import './calendar.css';
 import './pending.css';
 import './calendar-progress.css';
 import CalendarProgressEnhancer from './CalendarProgressEnhancer';
+
+export const metadata: Metadata = {
+  title: 'БлагоТвори. Кемь — календарь добрых дел',
+  description: 'Понятный календарь волонтёрских вакансий для детей и молодёжи Кемского муниципального округа.'
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
