@@ -17,6 +17,45 @@ function isAuthorized(request: NextRequest) {
   return checkBlagotvoriAdminPassword(request.headers.get('x-admin-password'));
 }
 
+function vacancyPayload(body: any) {
+  const required = ['title', 'category', 'event_date', 'start_time', 'place', 'estimated_minutes', 'slots', 'format', 'confirmation_type', 'confirmation_text', 'description'];
+  const missing = required.find(key => body[key] === undefined || body[key] === null || String(body[key]).trim() === '');
+  if (missing) throw new Error(`Не заполнено обязательное поле: ${missing}.`);
+
+  const payload = {
+    title: String(body.title).trim(),
+    category: String(body.category),
+    event_date: String(body.event_date),
+    start_time: String(body.start_time),
+    end_time: body.end_time ? String(body.end_time) : null,
+    place: String(body.place).trim(),
+    estimated_minutes: Number(body.estimated_minutes),
+    slots: Number(body.slots),
+    min_age: body.min_age ? Number(body.min_age) : null,
+    max_age: body.max_age ? Number(body.max_age) : null,
+    format: String(body.format),
+    confirmation_type: String(body.confirmation_type),
+    confirmation_text: String(body.confirmation_text).trim(),
+    description: String(body.description).trim(),
+    duties: Array.isArray(body.duties) ? body.duties.filter(Boolean) : [],
+    take_with_you: String(body.take_with_you || 'Ничего специального брать не нужно.').trim(),
+    contact_person: body.contact_person ? String(body.contact_person).trim() : null,
+    is_active: body.is_active !== false,
+    updated_at: new Date().toISOString()
+  };
+
+  if (!Number.isFinite(payload.estimated_minutes) || payload.estimated_minutes <= 0) {
+    throw new Error('Количество минут должно быть больше нуля.');
+  }
+  if (!Number.isInteger(payload.slots) || payload.slots <= 0) {
+    throw new Error('Количество мест должно быть целым числом больше нуля.');
+  }
+  if (payload.min_age && payload.max_age && payload.min_age > payload.max_age) {
+    throw new Error('Минимальный возраст не может быть больше максимального.');
+  }
+  return payload;
+}
+
 export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) return unauthorized();
   if (!isBlagotvoriConfigured()) return unavailable();
@@ -45,46 +84,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const required = ['title', 'category', 'event_date', 'start_time', 'place', 'estimated_minutes', 'slots', 'format', 'confirmation_type', 'confirmation_text', 'description'];
-    const missing = required.find(key => body[key] === undefined || body[key] === null || String(body[key]).trim() === '');
-    if (missing) {
-      return NextResponse.json({ error: `Не заполнено обязательное поле: ${missing}.` }, { status: 400 });
-    }
-
-    const payload = {
-      title: String(body.title).trim(),
-      category: String(body.category),
-      event_date: String(body.event_date),
-      start_time: String(body.start_time),
-      end_time: body.end_time ? String(body.end_time) : null,
-      place: String(body.place).trim(),
-      estimated_minutes: Number(body.estimated_minutes),
-      slots: Number(body.slots),
-      min_age: body.min_age ? Number(body.min_age) : null,
-      max_age: body.max_age ? Number(body.max_age) : null,
-      format: String(body.format),
-      confirmation_type: String(body.confirmation_type),
-      confirmation_text: String(body.confirmation_text).trim(),
-      description: String(body.description).trim(),
-      duties: Array.isArray(body.duties) ? body.duties.filter(Boolean) : [],
-      take_with_you: String(body.take_with_you || 'Ничего специального брать не нужно.').trim(),
-      contact_person: body.contact_person ? String(body.contact_person).trim() : null,
-      is_active: body.is_active !== false
-    };
-
-    if (!Number.isFinite(payload.estimated_minutes) || payload.estimated_minutes <= 0) {
-      return NextResponse.json({ error: 'Количество минут должно быть больше нуля.' }, { status: 400 });
-    }
-    if (!Number.isInteger(payload.slots) || payload.slots <= 0) {
-      return NextResponse.json({ error: 'Количество мест должно быть целым числом больше нуля.' }, { status: 400 });
-    }
-
+    const payload = vacancyPayload(body);
     const supabase = getBlagotvoriAdmin();
     const { data, error } = await supabase.from('bt_vacancies').insert(payload).select('*').single();
     if (error) throw error;
     return NextResponse.json({ vacancy: data }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Не удалось создать вакансию.' }, { status: 500 });
+    const status = String(error?.message || '').startsWith('Не заполнено') || String(error?.message || '').includes('возраст') || String(error?.message || '').includes('Количество') ? 400 : 500;
+    return NextResponse.json({ error: error?.message || 'Не удалось создать вакансию.' }, { status });
   }
 }
 
@@ -94,6 +101,34 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
+    const supabase = getBlagotvoriAdmin();
+
+    if (body.vacancy_id) {
+      const vacancyId = String(body.vacancy_id).trim();
+      if (!vacancyId) return NextResponse.json({ error: 'Не указана вакансия.' }, { status: 400 });
+
+      if (body.action === 'toggle_active') {
+        const { data, error } = await supabase
+          .from('bt_vacancies')
+          .update({ is_active: Boolean(body.is_active), updated_at: new Date().toISOString() })
+          .eq('id', vacancyId)
+          .select('*')
+          .single();
+        if (error) throw error;
+        return NextResponse.json({ vacancy: data });
+      }
+
+      const payload = vacancyPayload(body);
+      const { data, error } = await supabase
+        .from('bt_vacancies')
+        .update(payload)
+        .eq('id', vacancyId)
+        .select('*')
+        .single();
+      if (error) throw error;
+      return NextResponse.json({ vacancy: data });
+    }
+
     const applicationId = String(body.application_id || '').trim();
     if (!applicationId) {
       return NextResponse.json({ error: 'Не указана заявка.' }, { status: 400 });
@@ -113,7 +148,6 @@ export async function PATCH(request: NextRequest) {
       if (body[key] !== undefined) update[key] = body[key];
     }
 
-    const supabase = getBlagotvoriAdmin();
     const { data, error } = await supabase
       .from('bt_applications')
       .update(update)
@@ -124,6 +158,7 @@ export async function PATCH(request: NextRequest) {
     if (error) throw error;
     return NextResponse.json({ application: data });
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Не удалось обновить заявку.' }, { status: 500 });
+    const status = String(error?.message || '').startsWith('Не заполнено') || String(error?.message || '').includes('возраст') || String(error?.message || '').includes('Количество') ? 400 : 500;
+    return NextResponse.json({ error: error?.message || 'Не удалось сохранить изменения.' }, { status });
   }
 }
