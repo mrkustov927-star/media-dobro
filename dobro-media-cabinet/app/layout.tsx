@@ -9,10 +9,11 @@ import './calendar-progress.css';
 import './admin-blagotvori/admin-polish.css';
 import CalendarProgressEnhancer from './CalendarProgressEnhancer';
 import DobroHoursNotice from './DobroHoursNotice';
+import VolunteerJourneyPortal from './VolunteerJourneyPortal';
 
 export const metadata: Metadata = {
   title: 'БлагоТвори. Кемь — календарь добрых дел',
-  description: 'Понятный календарь волонтёрских вакансий для детей и молодёжи Кемского муниципального округа.'
+  description: 'Понятный календарь волонтёрских вакансий для детей, молодёжи и наставников Кемского муниципального округа.'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <DobroHoursNotice />
         {children}
+        <VolunteerJourneyPortal />
         <CalendarProgressEnhancer />
         <script
           dangerouslySetInnerHTML={{
