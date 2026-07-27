@@ -17,16 +17,19 @@ const occupiedStatuses = [
 export async function GET() {
   if (!isBlagotvoriConfigured()) {
     return NextResponse.json(
-      { mode: 'demo', vacancies: demoVacancies },
+      {
+        mode: 'demo',
+        vacancies: demoVacancies.map(vacancy => ({
+          ...vacancy,
+          occupied_slots: Math.max(0, Number(vacancy.slots) - Number(vacancy.free_slots))
+        }))
+      },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
     );
   }
 
   try {
     const supabase = getBlagotvoriAdmin();
-
-    // Вакансии являются основными данными. Ошибка дополнительного подсчёта
-    // заявок не должна подменять их демонстрационным списком.
     const { data: vacancies, error: vacanciesError } = await supabase
       .from('bt_vacancies')
       .select('*')
@@ -51,11 +54,15 @@ export async function GET() {
       counts.set(application.vacancy_id, (counts.get(application.vacancy_id) || 0) + 1);
     }
 
-    const result = (vacancies || []).map(vacancy => ({
-      ...vacancy,
-      duties: Array.isArray(vacancy.duties) ? vacancy.duties : [],
-      free_slots: Math.max(0, Number(vacancy.slots) - (counts.get(vacancy.id) || 0))
-    }));
+    const result = (vacancies || []).map(vacancy => {
+      const occupiedSlots = counts.get(vacancy.id) || 0;
+      return {
+        ...vacancy,
+        duties: Array.isArray(vacancy.duties) ? vacancy.duties : [],
+        occupied_slots: occupiedSlots,
+        free_slots: Math.max(0, Number(vacancy.slots) - occupiedSlots)
+      };
+    });
 
     return NextResponse.json(
       {
