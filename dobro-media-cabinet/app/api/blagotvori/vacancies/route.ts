@@ -3,6 +3,7 @@ import { demoVacancies } from '@/lib/blagotvori/demoVacancies';
 import { getBlagotvoriAdmin, isBlagotvoriConfigured } from '@/lib/blagotvori/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const occupiedStatuses = [
   'Заявка подана',
@@ -15,29 +16,38 @@ const occupiedStatuses = [
 
 export async function GET() {
   if (!isBlagotvoriConfigured()) {
-    return NextResponse.json({ mode: 'demo', vacancies: demoVacancies });
+    return NextResponse.json(
+      { mode: 'demo', vacancies: demoVacancies },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+    );
   }
 
   try {
     const supabase = getBlagotvoriAdmin();
-    const [{ data: vacancies, error: vacanciesError }, { data: applications, error: applicationsError }] = await Promise.all([
-      supabase
-        .from('bt_vacancies')
-        .select('*')
-        .eq('is_active', true)
-        .order('event_date', { ascending: true })
-        .order('start_time', { ascending: true }),
-      supabase
-        .from('bt_applications')
-        .select('vacancy_id,status')
-        .in('status', occupiedStatuses)
-    ]);
+
+    // Вакансии являются основными данными. Ошибка дополнительного подсчёта
+    // заявок не должна подменять их демонстрационным списком.
+    const { data: vacancies, error: vacanciesError } = await supabase
+      .from('bt_vacancies')
+      .select('*')
+      .eq('is_active', true)
+      .order('event_date', { ascending: true })
+      .order('start_time', { ascending: true });
 
     if (vacanciesError) throw vacanciesError;
-    if (applicationsError) throw applicationsError;
+
+    let applications: Array<{ vacancy_id: string; status: string }> = [];
+    const { data: applicationRows, error: applicationsError } = await supabase
+      .from('bt_applications')
+      .select('vacancy_id,status')
+      .in('status', occupiedStatuses);
+
+    if (!applicationsError && Array.isArray(applicationRows)) {
+      applications = applicationRows;
+    }
 
     const counts = new Map<string, number>();
-    for (const application of applications || []) {
+    for (const application of applications) {
       counts.set(application.vacancy_id, (counts.get(application.vacancy_id) || 0) + 1);
     }
 
@@ -48,10 +58,20 @@ export async function GET() {
     }));
 
     return NextResponse.json(
-      { mode: 'live', vacancies: result },
-      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+      {
+        mode: 'live',
+        vacancies: result,
+        counts_available: !applicationsError
+      },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
     );
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Не удалось загрузить вакансии.' }, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || 'Не удалось загрузить вакансии.' },
+      {
+        status: 500,
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' }
+      }
+    );
   }
 }
