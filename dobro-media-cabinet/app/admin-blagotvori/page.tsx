@@ -51,6 +51,14 @@ const categories: VacancyCategory[] = [
   'Дистанционные задания'
 ];
 
+const categoryIcons: Record<VacancyCategory, string> = {
+  'Помощь людям': '❤',
+  'Природа и животные': '🌿',
+  'Помощь на мероприятиях': '🎪',
+  'Медиа': '📷',
+  'Дистанционные задания': '💻'
+};
+
 const confirmationTypes = [
   'Подтверждение организатора',
   'Ссылка на материал',
@@ -69,6 +77,12 @@ function minutesToHours(value: number | null) {
   return Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace('.', ',');
 }
 
+function formatDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' })
+    .format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 export default function AdminBlagotvoriPage() {
   const [password, setPassword] = useState('');
   const [connected, setConnected] = useState(false);
@@ -76,6 +90,7 @@ export default function AdminBlagotvoriPage() {
   const [message, setMessage] = useState('');
   const [vacancies, setVacancies] = useState<AdminVacancy[]>([]);
   const [applications, setApplications] = useState<AdminApplication[]>([]);
+  const [activeSection, setActiveSection] = useState<'create' | 'applications'>('create');
 
   async function api(path: string, init: RequestInit = {}) {
     const response = await fetch(path, {
@@ -133,17 +148,17 @@ export default function AdminBlagotvoriPage() {
           slots: Number(data.get('slots')),
           min_age: data.get('min_age') || null,
           max_age: data.get('max_age') || null,
-          format: data.get('format'),
-          confirmation_type: data.get('confirmation_type'),
-          confirmation_text: data.get('confirmation_text'),
+          format: data.get('format') || 'Очно',
+          confirmation_type: data.get('confirmation_type') || 'Подтверждение организатора',
+          confirmation_text: data.get('confirmation_text') || 'Организатор подтвердит участие и фактически отработанное время.',
           description: data.get('description'),
           duties,
-          take_with_you: data.get('take_with_you'),
-          contact_person: data.get('contact_person')
+          take_with_you: data.get('take_with_you') || 'Ничего специального брать не нужно.',
+          contact_person: data.get('contact_person') || 'Евгений Валерьевич Кустов'
         })
       });
       form.reset();
-      setMessage('Вакансия создана и появилась в календаре.');
+      setMessage('Готово! Вакансия опубликована в календаре.');
       await loadCabinet();
     } catch (error: any) {
       setMessage(error?.message || 'Не удалось создать вакансию.');
@@ -186,7 +201,7 @@ export default function AdminBlagotvoriPage() {
           <a href="/" className={styles.backLink}>← Вернуться к календарю</a>
           <span className={styles.kicker}>БлагоТвори. Кемь</span>
           <h1>Кабинет организатора</h1>
-          <p>Введите отдельный пароль нового сайта. Пароль от «Добро.Медиа» здесь не используется автоматически.</p>
+          <p>Здесь можно быстро опубликовать доброе дело и обработать заявки участников.</p>
           <label>Пароль организатора<input type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') loadCabinet(); }} /></label>
           <button type="button" onClick={loadCabinet} disabled={loading || !password}>{loading ? 'Проверяем…' : 'Войти'}</button>
           {message && <div className={styles.alert}>{message}</div>}
@@ -201,9 +216,10 @@ export default function AdminBlagotvoriPage() {
         <div>
           <span className={styles.kicker}>БлагоТвори. Кемь</span>
           <h1>Кабинет организатора</h1>
+          <p className={styles.headerLead}>Публикуйте задания и подтверждайте участие без лишних настроек.</p>
         </div>
         <div className={styles.headerActions}>
-          <a href="/">Открыть календарь</a>
+          <a href="/">Открыть сайт</a>
           <button type="button" onClick={loadCabinet}>Обновить</button>
         </div>
       </header>
@@ -211,67 +227,119 @@ export default function AdminBlagotvoriPage() {
       {message && <div className={styles.notice}>{message}</div>}
 
       <section className={styles.stats}>
-        <article><span>Вакансий</span><b>{vacancies.length}</b></article>
-        <article><span>Заявок</span><b>{applications.length}</b></article>
+        <article><span>Активных дел</span><b>{vacancies.filter(item => item.is_active).length}</b></article>
+        <article><span>Новых заявок</span><b>{applications.filter(item => item.status === 'Заявка подана').length}</b></article>
         <article><span>Часы зачтены</span><b>{applications.filter(item => item.hours_confirmed).length}</b></article>
         <article><span>Внесены на Добро.рф</span><b>{applications.filter(item => item.dobro_hours_entered).length}</b></article>
       </section>
 
-      <section className={styles.panel}>
-        <div className={styles.panelHead}>
-          <div><span>01</span><h2>Создать вакансию</h2></div>
-          <p>После сохранения вакансия сразу появится в календаре.</p>
-        </div>
-        <form className={styles.vacancyForm} onSubmit={createVacancy}>
-          <label className={styles.wide}>Название вакансии<input name="title" required /></label>
-          <label>Категория<select name="category" required>{categories.map(item => <option key={item}>{item}</option>)}</select></label>
-          <label>Формат<select name="format" required><option>Очно</option><option>Дистанционно</option></select></label>
-          <label>Дата<input name="event_date" type="date" required /></label>
-          <label>Начало<input name="start_time" type="time" required /></label>
-          <label>Окончание<input name="end_time" type="time" /></label>
-          <label>Количество часов<input name="hours" inputMode="decimal" placeholder="Например: 3" required /></label>
-          <label>Количество мест<input name="slots" type="number" min="1" defaultValue="1" required /></label>
-          <label>Минимальный возраст<input name="min_age" type="number" min="6" max="35" /></label>
-          <label>Максимальный возраст<input name="max_age" type="number" min="6" max="35" /></label>
-          <label className={styles.wide}>Место<input name="place" required /></label>
-          <label>Способ подтверждения<select name="confirmation_type" required>{confirmationTypes.map(item => <option key={item}>{item}</option>)}</select></label>
-          <label>Ответственный<input name="contact_person" defaultValue="Евгений Валерьевич Кустов" /></label>
-          <label className={styles.wide}>Краткое описание<textarea name="description" rows={3} required /></label>
-          <label className={styles.wide}>Что предстоит делать<textarea name="duties" rows={4} placeholder="Каждое действие — с новой строки" required /></label>
-          <label className={styles.wide}>Как подтвердить участие<textarea name="confirmation_text" rows={3} required /></label>
-          <label className={styles.wide}>Что взять с собой<textarea name="take_with_you" rows={2} defaultValue="Ничего специального брать не нужно." /></label>
-          <button type="submit" disabled={loading}>{loading ? 'Сохраняем…' : 'Создать вакансию'}</button>
-        </form>
-      </section>
+      <nav className={styles.sectionTabs} aria-label="Разделы кабинета">
+        <button type="button" data-active={activeSection === 'create'} onClick={() => setActiveSection('create')}>
+          <span>＋</span> Создать вакансию
+        </button>
+        <button type="button" data-active={activeSection === 'applications'} onClick={() => setActiveSection('applications')}>
+          <span>{applications.length}</span> Заявки волонтёров
+        </button>
+      </nav>
 
-      <section className={styles.panel}>
-        <div className={styles.panelHead}>
-          <div><span>02</span><h2>Заявки волонтёров</h2></div>
-          <p>Подтвердите участие, фактические часы и перенос на Добро.рф.</p>
-        </div>
+      {activeSection === 'create' && (
+        <>
+          <section className={styles.panel}>
+            <div className={styles.panelHead}>
+              <div><span>01</span><h2>Новое доброе дело</h2></div>
+              <p>Сначала заполните только главное. Остальное уже настроено.</p>
+            </div>
 
-        <div className={styles.applicationList}>
-          {!applications.length && <div className={styles.empty}>Заявок пока нет.</div>}
-          {applications.map(application => (
-            <form className={styles.applicationCard} key={application.id} onSubmit={event => updateApplication(event, application.id)}>
-              <div className={styles.applicationTitle}>
-                <div><b>{application.volunteer_name}</b><a href={application.contact.startsWith('http') ? application.contact : undefined}>{application.contact}</a></div>
-                <span>{application.vacancy?.title || 'Вакансия удалена'}</span>
+            <form className={styles.vacancyForm} onSubmit={createVacancy}>
+              <div className={styles.formStep}>
+                <span>Шаг 1</span>
+                <div><b>Что и когда?</b><small>Название, дата и время участия</small></div>
               </div>
-              <div className={styles.applicationGrid}>
-                <label>Статус<select name="status" defaultValue={application.status}>{statuses.map(item => <option key={item}>{item}</option>)}</select></label>
-                <label>Фактические часы<input name="actual_hours" inputMode="decimal" defaultValue={minutesToHours(application.actual_minutes)} placeholder="Например: 3" /></label>
-                <label className={styles.comment}>Комментарий организатора<textarea name="admin_comment" rows={2} defaultValue={application.admin_comment || ''} /></label>
+
+              <label className={styles.wide}>Название вакансии<input name="title" required placeholder="Например: Помочь на семейном празднике" /></label>
+              <label>Категория<select name="category" required>{categories.map(item => <option key={item}>{item}</option>)}</select></label>
+              <label>Дата<input name="event_date" type="date" required /></label>
+              <label>Начало<input name="start_time" type="time" required /></label>
+              <label>Количество часов<input name="hours" inputMode="decimal" placeholder="Например: 3" required /></label>
+
+              <div className={styles.formStep}>
+                <span>Шаг 2</span>
+                <div><b>Где и сколько человек?</b><small>Этого достаточно для публикации</small></div>
               </div>
-              <div className={styles.checks}>
-                <label><input name="hours_confirmed" type="checkbox" defaultChecked={application.hours_confirmed} /> Часы подтверждены</label>
-                <label><input name="dobro_hours_entered" type="checkbox" defaultChecked={application.dobro_hours_entered} /> Часы внесены на Добро.рф</label>
-              </div>
-              <button type="submit" disabled={loading}>Сохранить заявку</button>
+
+              <label className={styles.wide}>Место<input name="place" required placeholder="Например: Центр культуры или дистанционно" /></label>
+              <label>Количество мест<input name="slots" type="number" min="1" defaultValue="1" required /></label>
+              <label className={styles.descriptionField}>Коротко о задании<textarea name="description" rows={4} required placeholder="Одним-двумя предложениями объясните, какая помощь нужна" /></label>
+
+              <details className={styles.advanced}>
+                <summary><span>Дополнительные настройки</span><small>Возраст, окончание, подтверждение и подробности</small></summary>
+                <div className={styles.advancedGrid}>
+                  <label>Окончание<input name="end_time" type="time" /></label>
+                  <label>Формат<select name="format" defaultValue="Очно"><option>Очно</option><option>Дистанционно</option></select></label>
+                  <label>Минимальный возраст<input name="min_age" type="number" min="6" max="99" /></label>
+                  <label>Максимальный возраст<input name="max_age" type="number" min="6" max="99" defaultValue="99" /></label>
+                  <label>Способ подтверждения<select name="confirmation_type" defaultValue="Подтверждение организатора">{confirmationTypes.map(item => <option key={item}>{item}</option>)}</select></label>
+                  <label>Ответственный<input name="contact_person" defaultValue="Евгений Валерьевич Кустов" /></label>
+                  <label className={styles.wide}>Что предстоит делать<textarea name="duties" rows={3} placeholder="Каждое действие — с новой строки" /></label>
+                  <label className={styles.wide}>Как подтвердить участие<textarea name="confirmation_text" rows={2} defaultValue="Организатор подтвердит участие и фактически отработанное время." /></label>
+                  <label className={styles.wide}>Что взять с собой<textarea name="take_with_you" rows={2} defaultValue="Ничего специального брать не нужно." /></label>
+                </div>
+              </details>
+
+              <button type="submit" disabled={loading}>{loading ? 'Публикуем…' : 'Опубликовать вакансию'}</button>
+              <p className={styles.submitHint}>После публикации карточка сразу появится на главной странице.</p>
             </form>
-          ))}
-        </div>
-      </section>
+          </section>
+
+          <section className={styles.panel}>
+            <div className={styles.panelHead}>
+              <div><span>02</span><h2>Опубликованные дела</h2></div>
+              <p>{vacancies.length} вакансий в базе</p>
+            </div>
+            <div className={styles.vacancyList}>
+              {!vacancies.length && <div className={styles.empty}>Вакансий пока нет.</div>}
+              {vacancies.map(vacancy => (
+                <article className={styles.vacancyCard} key={vacancy.id}>
+                  <span className={styles.vacancyIcon}>{categoryIcons[vacancy.category]}</span>
+                  <div><small>{vacancy.category}</small><b>{vacancy.title}</b><p>{formatDate(vacancy.event_date)}, {vacancy.start_time.slice(0, 5)} · {vacancy.slots} мест</p></div>
+                  <em data-active={vacancy.is_active}>{vacancy.is_active ? 'Опубликована' : 'Скрыта'}</em>
+                </article>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+
+      {activeSection === 'applications' && (
+        <section className={styles.panel}>
+          <div className={styles.panelHead}>
+            <div><span>01</span><h2>Заявки волонтёров</h2></div>
+            <p>Подтвердите участие, часы и перенос на Добро.рф.</p>
+          </div>
+
+          <div className={styles.applicationList}>
+            {!applications.length && <div className={styles.empty}>Заявок пока нет.</div>}
+            {applications.map(application => (
+              <form className={styles.applicationCard} key={application.id} onSubmit={event => updateApplication(event, application.id)}>
+                <div className={styles.applicationTitle}>
+                  <div><b>{application.volunteer_name}</b><a href={application.contact.startsWith('http') ? application.contact : undefined}>{application.contact}</a></div>
+                  <span>{application.vacancy?.title || 'Вакансия удалена'}</span>
+                </div>
+                <div className={styles.applicationGrid}>
+                  <label>Статус<select name="status" defaultValue={application.status}>{statuses.map(item => <option key={item}>{item}</option>)}</select></label>
+                  <label>Фактические часы<input name="actual_hours" inputMode="decimal" defaultValue={minutesToHours(application.actual_minutes)} placeholder="Например: 3" /></label>
+                  <label className={styles.comment}>Комментарий организатора<textarea name="admin_comment" rows={2} defaultValue={application.admin_comment || ''} /></label>
+                </div>
+                <div className={styles.checks}>
+                  <label><input name="hours_confirmed" type="checkbox" defaultChecked={application.hours_confirmed} /> Часы подтверждены</label>
+                  <label><input name="dobro_hours_entered" type="checkbox" defaultChecked={application.dobro_hours_entered} /> Часы внесены на Добро.рф</label>
+                </div>
+                <button type="submit" disabled={loading}>Сохранить заявку</button>
+              </form>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
