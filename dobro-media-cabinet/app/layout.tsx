@@ -7,11 +7,13 @@ import './calendar.css';
 import './pending.css';
 import './calendar-progress.css';
 import './participant-initials.css';
+import './application-access.css';
 import './admin-blagotvori/admin-polish.css';
 import CalendarProgressEnhancer from './CalendarProgressEnhancer';
 import DobroHoursNotice from './DobroHoursNotice';
 import VolunteerJourneyPortal from './VolunteerJourneyPortal';
 import ParticipantInitialsEnhancer from './ParticipantInitialsEnhancer';
+import ApplicationReceiptEnhancer from './ApplicationReceiptEnhancer';
 import ReportQuickLink from './ReportQuickLink';
 
 export const metadata: Metadata = {
@@ -27,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <VolunteerJourneyPortal />
         <ParticipantInitialsEnhancer />
+        <ApplicationReceiptEnhancer />
         <CalendarProgressEnhancer />
         <ReportQuickLink />
         <script
