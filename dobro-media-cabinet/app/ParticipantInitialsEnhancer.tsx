@@ -6,13 +6,12 @@ type PublicVacancy = {
   id: string;
   title: string;
   participant_initials?: string[];
-  participant_names?: string[];
-  occupied_slots?: number;
-  slots: number;
 };
 
 function participantText(vacancy: PublicVacancy) {
-  const initials = Array.isArray(vacancy.participant_initials) ? vacancy.participant_initials.filter(Boolean) : [];
+  const initials = Array.isArray(vacancy.participant_initials)
+    ? vacancy.participant_initials.map(value => String(value).trim()).filter(Boolean)
+    : [];
   if (!initials.length) return '';
 
   const visible = initials.slice(0, 3).join(', ');
@@ -20,25 +19,21 @@ function participantText(vacancy: PublicVacancy) {
   return rest > 0 ? `Уже участвуют: ${visible} и ещё ${rest}` : `Уже участвуют: ${visible}`;
 }
 
-function participantNames(vacancy: PublicVacancy) {
-  return Array.isArray(vacancy.participant_names)
-    ? vacancy.participant_names.map(name => String(name).trim()).filter(Boolean)
-    : [];
-}
-
 export default function ParticipantInitialsEnhancer() {
   useEffect(() => {
     let stopped = false;
+    let vacancies: PublicVacancy[] = [];
     const timers: Array<ReturnType<typeof setTimeout>> = [];
-    let latestVacancies: PublicVacancy[] = [];
 
-    function applyCardBadges() {
+    function apply() {
+      if (stopped) return;
+
       const candidates = Array.from(
         document.querySelectorAll<HTMLElement>(
           'button[class*="vacancy"], button[class*="nearestCard"], button[class*="mobileVacancy"], button[class*="heroMiniCard"]'
         )
       );
-      const titleMap = new Map(latestVacancies.map(vacancy => [vacancy.title, vacancy]));
+      const titleMap = new Map(vacancies.map(vacancy => [vacancy.title, vacancy]));
 
       document.querySelectorAll<HTMLElement>('[data-participant-initials]').forEach(badge => {
         const vacancy = titleMap.get(badge.dataset.vacancyTitle || '');
@@ -47,18 +42,17 @@ export default function ParticipantInitialsEnhancer() {
         else if (badge.textContent !== label) badge.textContent = label;
       });
 
-      for (const vacancy of latestVacancies) {
+      vacancies.forEach(vacancy => {
         const label = participantText(vacancy);
-        if (!label) continue;
+        if (!label) return;
 
-        for (const element of candidates) {
-          const text = element.textContent || '';
-          if (!text.includes(vacancy.title)) continue;
+        candidates.forEach(element => {
+          if (!(element.textContent || '').includes(vacancy.title)) return;
 
           const existing = element.querySelector<HTMLElement>(
             `[data-participant-initials][data-vacancy-id="${vacancy.id}"]`
           );
-          if (existing) continue;
+          if (existing) return;
 
           const badge = document.createElement('span');
           badge.setAttribute('data-participant-initials', 'true');
@@ -70,76 +64,21 @@ export default function ParticipantInitialsEnhancer() {
           const footer = element.querySelector('[class*="nearestBottom"], [class*="vacancyMeta"], em[data-tone]');
           if (footer?.parentElement === element) element.insertBefore(badge, footer);
           else element.appendChild(badge);
-        }
-      }
-    }
-
-    function applyModalTeam() {
-      const title = document.getElementById('vacancy-title');
-      const dialog = title?.closest<HTMLElement>('[role="dialog"]');
-      if (!title || !dialog) return;
-
-      const vacancy = latestVacancies.find(item => item.title === (title.textContent || '').trim());
-      const names = vacancy ? participantNames(vacancy) : [];
-      const existing = dialog.querySelector<HTMLElement>('[data-participant-team]');
-
-      if (!vacancy || !names.length) {
-        existing?.remove();
-        return;
-      }
-
-      if (existing?.dataset.vacancyId === vacancy.id) {
-        const currentNames = Array.from(existing.querySelectorAll('li')).map(item => item.textContent || '');
-        if (currentNames.join('|') === names.join('|')) return;
-        existing.remove();
-      } else {
-        existing?.remove();
-      }
-
-      const section = document.createElement('section');
-      section.className = 'participant-team-card';
-      section.setAttribute('data-participant-team', 'true');
-      section.setAttribute('data-vacancy-id', vacancy.id);
-
-      const heading = document.createElement('h3');
-      heading.textContent = 'Кто работает над задачей';
-      section.appendChild(heading);
-
-      const lead = document.createElement('p');
-      lead.textContent = names.length === 1 ? 'Вакансию взял участник:' : 'Вакансию взяли участники:';
-      section.appendChild(lead);
-
-      const list = document.createElement('ul');
-      names.forEach(name => {
-        const item = document.createElement('li');
-        item.textContent = name;
-        list.appendChild(item);
+        });
       });
-      section.appendChild(list);
-
-      const facts = dialog.querySelector<HTMLElement>('[class*="modalFacts"]');
-      if (facts?.nextSibling) facts.parentElement?.insertBefore(section, facts.nextSibling);
-      else if (facts?.parentElement) facts.parentElement.appendChild(section);
-      else title.insertAdjacentElement('afterend', section);
     }
 
-    function apply() {
-      if (stopped) return;
-      applyCardBadges();
-      applyModalTeam();
-    }
-
-    function scheduleApply(delays = [0, 80, 220]) {
+    function scheduleApply(delays = [0, 400, 1100]) {
       delays.forEach(delay => timers.push(setTimeout(apply, delay)));
     }
 
-    async function refreshOnce() {
+    async function refresh() {
       try {
         const response = await fetch('/api/blagotvori/vacancies', { cache: 'no-store' });
         if (!response.ok || stopped) return;
         const json = await response.json();
-        latestVacancies = Array.isArray(json.vacancies) ? json.vacancies : [];
-        scheduleApply([0, 500, 1500]);
+        vacancies = Array.isArray(json.vacancies) ? json.vacancies : [];
+        scheduleApply();
       } catch {
         // Основной календарь продолжает работать без дополнительного индикатора.
       }
@@ -147,18 +86,13 @@ export default function ParticipantInitialsEnhancer() {
 
     function handleClick(event: MouseEvent) {
       const target = event.target instanceof HTMLElement ? event.target : null;
-      if (!target?.closest('button')) return;
-
-      scheduleApply();
-      const submitButton = target.closest('button[type="submit"]');
-      if (submitButton) {
-        timers.push(setTimeout(() => { void refreshOnce(); }, 1200));
-        timers.push(setTimeout(() => { void refreshOnce(); }, 2800));
-      }
+      if (!target?.closest('button[type="submit"]')) return;
+      timers.push(setTimeout(() => { void refresh(); }, 1200));
+      timers.push(setTimeout(() => { void refresh(); }, 2800));
     }
 
     document.addEventListener('click', handleClick, true);
-    timers.push(setTimeout(() => { void refreshOnce(); }, 250));
+    timers.push(setTimeout(() => { void refresh(); }, 250));
 
     return () => {
       stopped = true;
