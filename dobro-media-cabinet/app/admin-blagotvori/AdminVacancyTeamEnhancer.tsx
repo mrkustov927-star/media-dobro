@@ -159,8 +159,19 @@ export default function AdminVacancyTeamEnhancer() {
       const button = target?.closest('button');
       if (!button) return;
 
+      const label = (button.textContent || '').trim();
+      if (label === 'Скрыть') {
+        const card = button.closest<HTMLElement>('article[class*="vacancyCard"]');
+        const title = card?.querySelector('h3')?.textContent?.trim() || 'эту вакансию';
+        const confirmed = window.confirm(`Скрыть вакансию «${title}» с сайта? Заявки и отчёты сохранятся.`);
+        if (!confirmed) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+      }
+
       scheduleApply();
-      const label = button.textContent || '';
       if (/Открыть кабинет|Обновить|Сохранить|Опубликовать|Показать|Скрыть/.test(label)) {
         timers.push(setTimeout(() => { void loadTeams(); }, 650));
         timers.push(setTimeout(() => { void loadTeams(); }, 1500));
