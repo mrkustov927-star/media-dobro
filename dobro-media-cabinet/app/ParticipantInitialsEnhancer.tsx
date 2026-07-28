@@ -22,22 +22,24 @@ function participantText(vacancy: PublicVacancy) {
 export default function ParticipantInitialsEnhancer() {
   useEffect(() => {
     let stopped = false;
-    let observer: MutationObserver | null = null;
-    let timer: ReturnType<typeof setInterval> | null = null;
+    const timers: Array<ReturnType<typeof setTimeout>> = [];
     let latestVacancies: PublicVacancy[] = [];
 
     function apply() {
       if (stopped) return;
 
-      const candidates = Array.from(document.querySelectorAll<HTMLElement>('button, article'));
+      const candidates = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          'button[class*="vacancy"], button[class*="nearestCard"], button[class*="mobileVacancy"], button[class*="heroMiniCard"]'
+        )
+      );
       const titleMap = new Map(latestVacancies.map(vacancy => [vacancy.title, vacancy]));
 
       document.querySelectorAll<HTMLElement>('[data-participant-initials]').forEach(badge => {
-        const title = badge.dataset.vacancyTitle || '';
-        const vacancy = titleMap.get(title);
+        const vacancy = titleMap.get(badge.dataset.vacancyTitle || '');
         const label = vacancy ? participantText(vacancy) : '';
         if (!label) badge.remove();
-        else badge.textContent = label;
+        else if (badge.textContent !== label) badge.textContent = label;
       });
 
       for (const vacancy of latestVacancies) {
@@ -48,11 +50,10 @@ export default function ParticipantInitialsEnhancer() {
           const text = element.textContent || '';
           if (!text.includes(vacancy.title)) continue;
 
-          const existing = element.querySelector<HTMLElement>(`[data-participant-initials][data-vacancy-id="${vacancy.id}"]`);
-          if (existing) {
-            existing.textContent = label;
-            continue;
-          }
+          const existing = element.querySelector<HTMLElement>(
+            `[data-participant-initials][data-vacancy-id="${vacancy.id}"]`
+          );
+          if (existing) continue;
 
           const badge = document.createElement('span');
           badge.setAttribute('data-participant-initials', 'true');
@@ -68,30 +69,26 @@ export default function ParticipantInitialsEnhancer() {
       }
     }
 
-    async function refresh() {
+    async function refreshOnce() {
       try {
-        const response = await fetch(`/api/blagotvori/vacancies?t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' }
-        });
-        if (!response.ok) return;
+        const response = await fetch('/api/blagotvori/vacancies', { cache: 'no-store' });
+        if (!response.ok || stopped) return;
         const json = await response.json();
         latestVacancies = Array.isArray(json.vacancies) ? json.vacancies : [];
-        apply();
+
+        [0, 500, 1500].forEach(delay => {
+          timers.push(setTimeout(apply, delay));
+        });
       } catch {
-        // Основной календарь продолжает работать даже без дополнительного индикатора.
+        // Основной календарь продолжает работать без дополнительного индикатора.
       }
     }
 
-    refresh();
-    timer = setInterval(refresh, 15000);
-    observer = new MutationObserver(apply);
-    observer.observe(document.body, { childList: true, subtree: true });
+    timers.push(setTimeout(() => { void refreshOnce(); }, 250));
 
     return () => {
       stopped = true;
-      observer?.disconnect();
-      if (timer) clearInterval(timer);
+      timers.forEach(timer => clearTimeout(timer));
     };
   }, []);
 
