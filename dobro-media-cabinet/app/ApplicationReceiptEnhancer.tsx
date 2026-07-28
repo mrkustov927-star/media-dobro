@@ -132,7 +132,7 @@ function injectReceipt(receipt: StoredReceipt) {
 
 export default function ApplicationReceiptEnhancer() {
   useEffect(() => {
-    const timers: Array<ReturnType<typeof setTimeout>> = [];
+    const timers: number[] = [];
     const originalFetch = window.fetch.bind(window);
 
     function scheduleApply() {
