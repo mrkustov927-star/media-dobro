@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { applicationAccessCode } from '@/lib/blagotvori/accessCode';
 import { getBlagotvoriAdmin, isBlagotvoriConfigured } from '@/lib/blagotvori/supabaseAdmin';
 
 function normalizeContact(value: string) {
@@ -74,9 +75,10 @@ export async function POST(request: NextRequest) {
     if (duplicate) {
       return NextResponse.json(
         {
-          error: 'Вы уже подали заявку на это доброе дело. Проверьте её в разделе «Мои заявки и часы».',
+          error: 'Вы уже подали заявку на это доброе дело. Сохраните персональный код и проверьте статус в разделе «Мои заявки и часы».',
           duplicate: true,
-          status: duplicate.status
+          status: duplicate.status,
+          access_code: applicationAccessCode(String(duplicate.id))
         },
         { status: 409 }
       );
@@ -93,7 +95,15 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ ok: true, duplicate: false, application: data }, { status: 201 });
+    return NextResponse.json(
+      {
+        ok: true,
+        duplicate: false,
+        application: data,
+        access_code: applicationAccessCode(String(data.id))
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     const message = error?.code === '23505'
       ? 'Вы уже подали заявку на это доброе дело.'
