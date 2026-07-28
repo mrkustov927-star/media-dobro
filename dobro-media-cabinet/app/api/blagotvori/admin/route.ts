@@ -46,10 +46,6 @@ function personKey(application: any) {
   return `${normalizeText(application.volunteer_name)}|${normalizeContact(application.contact)}`;
 }
 
-function isActiveApplication(status: unknown) {
-  return status !== 'Отменено' && status !== 'Не участвовал';
-}
-
 const statusRank: Record<string, number> = {
   'Отменено': 0,
   'Не участвовал': 1,
@@ -94,23 +90,26 @@ async function cleanupDuplicateVacancies(supabase: any) {
   if (vacanciesError) throw vacanciesError;
   if (applicationsError) throw applicationsError;
 
+  const vacancyRows: any[] = vacancies || [];
+  const applicationRows: any[] = applications || [];
   const groups = new Map<string, any[]>();
-  for (const vacancy of vacancies || []) {
+
+  vacancyRows.forEach(vacancy => {
     const key = vacancyKey(vacancy);
     const group = groups.get(key) || [];
     group.push(vacancy);
     groups.set(key, group);
-  }
+  });
 
   let removedVacancies = 0;
   let movedApplications = 0;
   let mergedApplications = 0;
 
-  for (const group of groups.values()) {
+  for (const group of Array.from(groups.values())) {
     if (group.length < 2) continue;
 
     const countApplications = (vacancyId: string) =>
-      (applications || []).filter((application: any) => application.vacancy_id === vacancyId).length;
+      applicationRows.filter(application => application.vacancy_id === vacancyId).length;
 
     const sorted = [...group].sort((left, right) => {
       const applicationDifference = countApplications(right.id) - countApplications(left.id);
@@ -121,21 +120,19 @@ async function cleanupDuplicateVacancies(supabase: any) {
     });
 
     const keeper = sorted[0];
-    const duplicates = sorted.slice(1);
-    const keeperApplications = (applications || []).filter((application: any) => application.vacancy_id === keeper.id);
+    const keeperApplications = applicationRows.filter(application => application.vacancy_id === keeper.id);
 
-    for (const duplicate of duplicates) {
-      const duplicateApplications = (applications || []).filter(
-        (application: any) => application.vacancy_id === duplicate.id
-      );
+    for (const duplicate of sorted.slice(1)) {
+      const duplicateApplications = applicationRows.filter(application => application.vacancy_id === duplicate.id);
 
       for (const application of duplicateApplications) {
-        const samePerson = keeperApplications.find((candidate: any) => personKey(candidate) === personKey(application));
+        const samePerson = keeperApplications.find(candidate => personKey(candidate) === personKey(application));
 
         if (samePerson) {
+          const merged = mergedApplication(samePerson, application);
           const { error: mergeError } = await supabase
             .from('bt_applications')
-            .update(mergedApplication(samePerson, application))
+            .update(merged)
             .eq('id', samePerson.id);
           if (mergeError) throw mergeError;
 
@@ -145,7 +142,7 @@ async function cleanupDuplicateVacancies(supabase: any) {
             .eq('id', application.id);
           if (deleteApplicationError) throw deleteApplicationError;
 
-          Object.assign(samePerson, mergedApplication(samePerson, application));
+          Object.assign(samePerson, merged);
           mergedApplications += 1;
         } else {
           const { error: moveError } = await supabase
