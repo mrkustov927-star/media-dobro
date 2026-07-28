@@ -15,9 +15,76 @@
   text-align: left;
 }
 
+.participant-team-card {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #d7e6fb;
+  border-radius: 19px;
+  background: linear-gradient(145deg, #f3f7ff, #ffffff);
+}
+
+.participant-team-card h3 {
+  margin: 0;
+  color: #13213a;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.participant-team-card p {
+  margin: 7px 0 12px;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.participant-team-card ul {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  list-style: none;
+}
+
+.participant-team-card li {
+  position: relative;
+  padding: 11px 13px 11px 38px;
+  border: 1px solid #dfe7f3;
+  border-radius: 13px;
+  color: #13213a;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.participant-team-card li::before {
+  content: '✓';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #2859d4;
+  font-size: 11px;
+  transform: translateY(-50%);
+}
+
 @media (max-width: 720px) {
   .participant-initials-badge {
     margin-top: 6px;
     font-size: 9px;
+  }
+
+  .participant-team-card {
+    margin-top: 14px;
+    padding: 15px;
+  }
+
+  .participant-team-card h3 {
+    font-size: 17px;
   }
 }
