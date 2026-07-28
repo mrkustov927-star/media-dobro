@@ -55,10 +55,12 @@ function normalizePersonKey(name: string, contact: string) {
   return `${name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU')}|${contact.replace(/\s+/g, '').toLocaleLowerCase('ru-RU')}`;
 }
 
+function normalizeFullName(name: string) {
+  return name.trim().replace(/\s+/g, ' ');
+}
+
 function toInitials(name: string) {
-  const parts = name
-    .trim()
-    .replace(/\s+/g, ' ')
+  const parts = normalizeFullName(name)
     .split(' ')
     .filter(Boolean)
     .slice(0, 2);
@@ -74,7 +76,8 @@ export async function GET() {
         vacancies: demoVacancies.map(vacancy => ({
           ...vacancy,
           occupied_slots: Math.max(0, Number(vacancy.slots) - Number(vacancy.free_slots)),
-          participant_initials: []
+          participant_initials: [],
+          participant_names: []
         }))
       },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
@@ -108,24 +111,32 @@ export async function GET() {
       applications = applicationRows;
     }
 
-    const peopleByVacancy = new Map<string, Map<string, string>>();
+    const peopleByVacancy = new Map<string, Map<string, { name: string; initials: string }>>();
     for (const application of applications) {
-      const people = peopleByVacancy.get(application.vacancy_id) || new Map<string, string>();
+      const people = peopleByVacancy.get(application.vacancy_id) || new Map<string, { name: string; initials: string }>();
       const key = normalizePersonKey(application.volunteer_name, application.contact);
-      if (!people.has(key)) people.set(key, toInitials(application.volunteer_name));
+      if (!people.has(key)) {
+        people.set(key, {
+          name: normalizeFullName(application.volunteer_name),
+          initials: toInitials(application.volunteer_name)
+        });
+      }
       peopleByVacancy.set(application.vacancy_id, people);
     }
 
     const result = (vacancies || []).map(vacancy => {
-      const people = peopleByVacancy.get(vacancy.id) || new Map<string, string>();
-      const initials = Array.from(people.values()).filter(Boolean);
-      const occupiedSlots = initials.length;
+      const people = peopleByVacancy.get(vacancy.id) || new Map<string, { name: string; initials: string }>();
+      const participants = Array.from(people.values());
+      const initials = participants.map(person => person.initials).filter(Boolean);
+      const names = participants.map(person => person.name).filter(Boolean);
+      const occupiedSlots = participants.length;
 
       return {
         ...vacancy,
         duties: Array.isArray(vacancy.duties) ? vacancy.duties : [],
         occupied_slots: occupiedSlots,
         participant_initials: initials,
+        participant_names: names,
         free_slots: Math.max(0, Number(vacancy.slots) - occupiedSlots)
       };
     });
