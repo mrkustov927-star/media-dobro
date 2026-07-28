@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import './admin-mobile-access.css';
 import AdminVacancyTeamEnhancer from './AdminVacancyTeamEnhancer';
 
 export default function AdminBlagotvoriLayout({ children }: { children: ReactNode }) {
