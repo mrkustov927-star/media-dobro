@@ -42,7 +42,7 @@ function capitalize(value: string) {
 }
 
 function looksLikeSurname(value: string) {
-  return /(ова|ева|ёва|ина|ына|ская|цкая|ский|цкий|ской|енко|ов|ев|ёв|ин|ын|ук|юк|ко|их|ых)$/iu.test(value);
+  return /(ова|ева|ёва|ина|ына|ская|цкая|ский|цкий|ской|енко|ов|ев|ёв|ин|ын|ук|юк|ко|их|ых)$/i.test(value);
 }
 
 function toShortName(name: string) {
