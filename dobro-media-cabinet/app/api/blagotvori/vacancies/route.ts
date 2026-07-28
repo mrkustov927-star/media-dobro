@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { demoVacancies } from '@/lib/blagotvori/demoVacancies';
-import { summerVacancies } from '@/lib/blagotvori/summerVacancies';
 import { getBlagotvoriAdmin, isBlagotvoriConfigured } from '@/lib/blagotvori/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
@@ -15,52 +14,32 @@ const occupiedStatuses = [
   'Часы зачтены'
 ];
 
-let summerSeedPromise: Promise<void> | null = null;
-
-function vacancyKey(title: string, eventDate: string) {
-  return `${title.trim()}|${eventDate}`;
+function normalizeText(value: unknown) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU');
 }
 
-function ensureSummerVacancies() {
-  if (!summerSeedPromise) {
-    summerSeedPromise = (async () => {
-      const supabase = getBlagotvoriAdmin();
-      const titles = summerVacancies.map(item => item.title);
-      const { data: existingRows, error: existingError } = await supabase
-        .from('bt_vacancies')
-        .select('title,event_date')
-        .in('title', titles);
+function normalizeTime(value: unknown) {
+  return String(value || '').slice(0, 5);
+}
 
-      if (existingError) throw existingError;
-
-      const existing = new Set(
-        (existingRows || []).map(row => vacancyKey(String(row.title || ''), String(row.event_date || '')))
-      );
-      const missing = summerVacancies.filter(item => !existing.has(vacancyKey(item.title, item.event_date)));
-
-      if (!missing.length) return;
-
-      const { error: insertError } = await supabase.from('bt_vacancies').insert(missing);
-      if (insertError) throw insertError;
-    })().catch(error => {
-      summerSeedPromise = null;
-      throw error;
-    });
-  }
-
-  return summerSeedPromise;
+function vacancyKey(vacancy: any) {
+  return [
+    normalizeText(vacancy.title),
+    String(vacancy.event_date || ''),
+    normalizeTime(vacancy.start_time),
+    normalizeText(vacancy.place),
+    normalizeText(vacancy.category)
+  ].join('|');
 }
 
 function normalizePersonKey(name: string, contact: string) {
-  return `${name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU')}|${contact.replace(/\s+/g, '').toLocaleLowerCase('ru-RU')}`;
-}
-
-function normalizeFullName(name: string) {
-  return name.trim().replace(/\s+/g, ' ');
+  return `${normalizeText(name)}|${String(contact || '').replace(/\s+/g, '').toLocaleLowerCase('ru-RU')}`;
 }
 
 function toInitials(name: string) {
-  const parts = normalizeFullName(name)
+  const parts = String(name || '')
+    .trim()
+    .replace(/\s+/g, ' ')
     .split(' ')
     .filter(Boolean)
     .slice(0, 2);
@@ -76,8 +55,7 @@ export async function GET() {
         vacancies: demoVacancies.map(vacancy => ({
           ...vacancy,
           occupied_slots: Math.max(0, Number(vacancy.slots) - Number(vacancy.free_slots)),
-          participant_initials: [],
-          participant_names: []
+          participant_initials: []
         }))
       },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
@@ -85,12 +63,6 @@ export async function GET() {
   }
 
   try {
-    try {
-      await ensureSummerVacancies();
-    } catch (seedError) {
-      console.error('Не удалось автоматически добавить летние вакансии:', seedError);
-    }
-
     const supabase = getBlagotvoriAdmin();
     const { data: vacancies, error: vacanciesError } = await supabase
       .from('bt_vacancies')
@@ -111,33 +83,44 @@ export async function GET() {
       applications = applicationRows;
     }
 
-    const peopleByVacancy = new Map<string, Map<string, { name: string; initials: string }>>();
+    const peopleByVacancy = new Map<string, Map<string, string>>();
     for (const application of applications) {
-      const people = peopleByVacancy.get(application.vacancy_id) || new Map<string, { name: string; initials: string }>();
-      const key = normalizePersonKey(application.volunteer_name, application.contact);
-      if (!people.has(key)) {
-        people.set(key, {
-          name: normalizeFullName(application.volunteer_name),
-          initials: toInitials(application.volunteer_name)
-        });
-      }
+      const people = peopleByVacancy.get(application.vacancy_id) || new Map<string, string>();
+      const personKey = normalizePersonKey(application.volunteer_name, application.contact);
+      if (!people.has(personKey)) people.set(personKey, toInitials(application.volunteer_name));
       peopleByVacancy.set(application.vacancy_id, people);
     }
 
-    const result = (vacancies || []).map(vacancy => {
-      const people = peopleByVacancy.get(vacancy.id) || new Map<string, { name: string; initials: string }>();
-      const participants = Array.from(people.values());
-      const initials = participants.map(person => person.initials).filter(Boolean);
-      const names = participants.map(person => person.name).filter(Boolean);
-      const occupiedSlots = participants.length;
+    const groups = new Map<string, any[]>();
+    for (const vacancy of vacancies || []) {
+      const key = vacancyKey(vacancy);
+      const group = groups.get(key) || [];
+      group.push(vacancy);
+      groups.set(key, group);
+    }
+
+    const result = Array.from(groups.values()).map(group => {
+      const keeper = group[0];
+      const people = new Map<string, string>();
+
+      for (const vacancy of group) {
+        const vacancyPeople = peopleByVacancy.get(vacancy.id);
+        vacancyPeople?.forEach((initials, personKey) => {
+          if (!people.has(personKey)) people.set(personKey, initials);
+        });
+      }
+
+      const initials = Array.from(people.values()).filter(Boolean);
+      const occupiedSlots = initials.length;
+      const slots = Math.max(...group.map(vacancy => Number(vacancy.slots) || 0), 1);
 
       return {
-        ...vacancy,
-        duties: Array.isArray(vacancy.duties) ? vacancy.duties : [],
+        ...keeper,
+        slots,
+        duties: Array.isArray(keeper.duties) ? keeper.duties : [],
         occupied_slots: occupiedSlots,
         participant_initials: initials,
-        participant_names: names,
-        free_slots: Math.max(0, Number(vacancy.slots) - occupiedSlots)
+        free_slots: Math.max(0, slots - occupiedSlots)
       };
     });
 
