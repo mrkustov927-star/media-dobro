@@ -1,0 +1,303 @@
+.my-activity-badge {
+  margin-top: 8px;
+  padding: 6px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  border-radius: 999px;
+  color: #146446;
+  background: #e7f8ef;
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.my-activity-modal-badge {
+  margin: 10px 0 2px;
+  padding: 10px 13px;
+  border: 1px solid #bfe8d2;
+  border-radius: 13px;
+  color: #146446;
+  background: #ebfaf2;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.application-receipt-card {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid #bdddcf;
+  border-radius: 20px;
+  color: #173127;
+  background: linear-gradient(145deg, #effbf5, #ffffff);
+  box-shadow: 0 14px 32px rgba(25, 96, 67, 0.09);
+}
+
+.application-receipt-card > b {
+  display: block;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.application-receipt-card > p {
+  margin: 8px 0 14px;
+  color: #536d62;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.application-receipt-code {
+  padding: 13px 14px;
+  display: block;
+  border: 1px dashed #6cb28f;
+  border-radius: 14px;
+  color: #123f2c;
+  background: #ffffff;
+  font-size: clamp(20px, 5vw, 28px);
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-align: center;
+  user-select: all;
+}
+
+.application-receipt-actions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.application-receipt-actions button {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  color: #ffffff;
+  background: #2859d4;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.application-receipt-actions button:first-child {
+  color: #2859d4;
+  background: #eaf0ff;
+}
+
+.access-code-form,
+.mentor-access-form {
+  display: grid;
+  gap: 12px;
+}
+
+.access-code-input {
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid #cbd6ea;
+  border-radius: 14px;
+  color: #172033;
+  background: #ffffff;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.access-code-help {
+  margin-top: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.access-code-help summary {
+  padding: 13px 14px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.access-code-help form {
+  padding: 0 14px 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.access-code-help label {
+  display: grid;
+  gap: 6px;
+  color: rgba(255,255,255,.84);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.access-code-help input {
+  min-height: 44px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 11px;
+  font: inherit;
+}
+
+.access-code-badge {
+  margin-top: 10px;
+  padding: 8px 10px;
+  display: inline-flex;
+  border-radius: 10px;
+  color: #234e3b;
+  background: #e8f8f0;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .04em;
+}
+
+.mentor-access-layout {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: .8fr 1.2fr;
+  gap: 18px;
+}
+
+.mentor-access-form {
+  padding: 22px;
+  border-radius: 20px;
+  color: #ffffff;
+  background: linear-gradient(145deg, #14213d, #2859d4);
+}
+
+.mentor-access-form h4 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.mentor-access-form p {
+  margin: 0;
+  color: rgba(255,255,255,.76);
+  line-height: 1.5;
+}
+
+.mentor-access-form button,
+.mentor-toolbar button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.mentor-access-form button {
+  color: #14213d;
+  background: #ffffff;
+}
+
+.mentor-group-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mentor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mentor-toolbar h4 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.mentor-toolbar button {
+  padding: 0 13px;
+  color: #2859d4;
+  background: #eaf0ff;
+}
+
+.mentor-child-card {
+  padding: 16px;
+  border: 1px solid #e0e6ef;
+  border-radius: 17px;
+  background: #ffffff;
+}
+
+.mentor-child-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mentor-child-head h5 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.mentor-child-head p {
+  margin: 0;
+  color: #747d90;
+  font-size: 13px;
+}
+
+.mentor-child-head button {
+  border: 0;
+  color: #9b2c2c;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.mentor-child-meta {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.mentor-child-meta span {
+  padding: 7px 9px;
+  border-radius: 9px;
+  color: #42506c;
+  background: #f1f4f8;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.mentor-empty {
+  min-height: 160px;
+  padding: 22px;
+  display: grid;
+  place-content: center;
+  border: 1px dashed #cfd6e4;
+  border-radius: 18px;
+  color: #778096;
+  text-align: center;
+  background: #fafbfe;
+}
+
+@media (max-width: 800px) {
+  .mentor-access-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .application-receipt-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .application-receipt-code {
+    font-size: 19px;
+  }
+
+  .mentor-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
