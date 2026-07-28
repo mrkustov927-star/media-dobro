@@ -12,10 +12,12 @@ type AdminVacancy = {
 };
 
 type AdminApplication = {
+  id: string;
   vacancy_id: string;
   volunteer_name: string;
   contact: string;
   status: string;
+  access_code: string;
 };
 
 const inactiveStatuses = new Set(['Отменено', 'Не участвовал']);
@@ -45,14 +47,15 @@ export default function AdminVacancyTeamEnhancer() {
     const timers: Array<ReturnType<typeof setTimeout>> = [];
 
     function participantsFor(vacancyId: string) {
-      const people = new Map<string, string>();
+      const people = new Map<string, AdminApplication>();
       applications
         .filter(application => application.vacancy_id === vacancyId && !inactiveStatuses.has(application.status))
         .forEach(application => {
           const key = personKey(application);
-          if (!people.has(key)) people.set(key, String(application.volunteer_name || '').trim().replace(/\s+/g, ' '));
+          const existing = people.get(key);
+          if (!existing || existing.status === 'Заявка подана') people.set(key, application);
         });
-      return Array.from(people.values()).filter(Boolean);
+      return Array.from(people.values());
     }
 
     function findVacancy(article: HTMLElement) {
@@ -77,8 +80,8 @@ export default function AdminVacancyTeamEnhancer() {
           return;
         }
 
-        const names = participantsFor(vacancy.id);
-        const signature = `${vacancy.id}|${names.join('|')}`;
+        const participants = participantsFor(vacancy.id);
+        const signature = `${vacancy.id}|${participants.map(item => `${item.id}:${item.status}`).join('|')}`;
         if (existing?.dataset.signature === signature) return;
         existing?.remove();
 
@@ -95,16 +98,33 @@ export default function AdminVacancyTeamEnhancer() {
         head.appendChild(heading);
 
         const counter = document.createElement('span');
-        counter.textContent = `${names.length} из ${vacancy.slots}`;
+        counter.textContent = `${participants.length} из ${vacancy.slots}`;
         head.appendChild(counter);
         section.appendChild(head);
 
-        if (names.length) {
+        if (participants.length) {
           const list = document.createElement('ul');
           list.className = styles.teamList;
-          names.forEach(name => {
+          participants.forEach(application => {
             const item = document.createElement('li');
-            item.textContent = name;
+
+            const name = document.createElement('b');
+            name.textContent = String(application.volunteer_name || '').trim().replace(/\s+/g, ' ');
+            item.appendChild(name);
+
+            const meta = document.createElement('div');
+            meta.className = styles.personMeta;
+
+            const status = document.createElement('span');
+            status.textContent = application.status;
+            meta.appendChild(status);
+
+            const code = document.createElement('code');
+            code.textContent = application.access_code;
+            code.title = 'Персональный код заявки для ребёнка и наставника';
+            meta.appendChild(code);
+
+            item.appendChild(meta);
             list.appendChild(item);
           });
           section.appendChild(list);
@@ -125,12 +145,18 @@ export default function AdminVacancyTeamEnhancer() {
       delays.forEach(delay => timers.push(setTimeout(applyTeams, delay)));
     }
 
+    function readPasswordFromPage() {
+      const field = document.querySelector<HTMLInputElement>('input[type="password"]');
+      if (field?.value) passwordRef.current = field.value;
+      return passwordRef.current;
+    }
+
     async function loadTeams() {
-      const password = passwordRef.current;
+      const password = readPasswordFromPage();
       if (!password || stopped) return;
 
       try {
-        const response = await fetch('/api/blagotvori/admin', {
+        const response = await fetch('/api/blagotvori/admin/application-codes', {
           headers: {
             'Content-Type': 'application/json',
             'x-admin-password': password
@@ -159,11 +185,12 @@ export default function AdminVacancyTeamEnhancer() {
       const button = target?.closest('button');
       if (!button) return;
 
+      readPasswordFromPage();
       scheduleApply();
       const label = button.textContent || '';
-      if (/Открыть кабинет|Обновить|Сохранить|Опубликовать|Показать|Скрыть/.test(label)) {
-        timers.push(setTimeout(() => { void loadTeams(); }, 650));
-        timers.push(setTimeout(() => { void loadTeams(); }, 1500));
+      if (/Открыть кабинет|Обновить|Вакансии|Сохранить|Опубликовать|Показать|Скрыть/.test(label)) {
+        timers.push(setTimeout(() => { void loadTeams(); }, 450));
+        timers.push(setTimeout(() => { void loadTeams(); }, 1200));
       }
     }
 
