@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBlagotvoriAdmin, isBlagotvoriConfigured } from '@/lib/blagotvori/supabaseAdmin';
+import {
+  formatBlagotvoriDate,
+  formatBlagotvoriTime,
+  sendBlagotvoriVk
+} from '@/lib/blagotvori/vkNotify';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -66,7 +71,7 @@ export async function POST(request: NextRequest) {
     const supabase = getBlagotvoriAdmin();
     const { data: application, error: findError } = await supabase
       .from('bt_applications')
-      .select('id,status')
+      .select('id,status,volunteer_name,contact,evidence_url,evidence_comment,vacancy:bt_vacancies(title,event_date,start_time)')
       .eq('vacancy_id', vacancyId)
       .ilike('volunteer_name', volunteerName)
       .ilike('contact', contact)
@@ -84,6 +89,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'По этой заявке часы уже зачтены. Изменить отчёт можно через организатора.' }, { status: 409 });
     }
 
+    const sameReport =
+      application.status === 'Отчёт отправлен' &&
+      String(application.evidence_url || '').trim() === evidenceUrl &&
+      String(application.evidence_comment || '').trim() === evidenceComment;
+
+    if (sameReport) {
+      return NextResponse.json({ ok: true, duplicate: true, application: { id: application.id, status: application.status } });
+    }
+
+    const previousStatus = String(application.status || '');
     const { data, error } = await supabase
       .from('bt_applications')
       .update({
@@ -97,7 +112,25 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ ok: true, application: data });
+
+    const vacancy = Array.isArray(application.vacancy) ? application.vacancy[0] : application.vacancy;
+    await sendBlagotvoriVk(
+      [
+        '📎 Новый отчёт по доброму делу',
+        '',
+        `Участник: ${application.volunteer_name}`,
+        `Контакт: ${application.contact}`,
+        `Вакансия: ${vacancy?.title || 'не указана'}`,
+        vacancy?.event_date
+          ? `Дата: ${formatBlagotvoriDate(vacancy.event_date)}, ${formatBlagotvoriTime(vacancy.start_time)}`
+          : null,
+        `Отчёт: ${evidenceComment}`,
+        evidenceUrl ? `Подтверждение: ${evidenceUrl}` : 'Ссылка на подтверждение не приложена.'
+      ],
+      `report:${application.id}:${previousStatus}:${evidenceUrl}:${evidenceComment}`
+    );
+
+    return NextResponse.json({ ok: true, duplicate: false, application: data });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Не удалось отправить отчёт.' }, { status: 500 });
   }
