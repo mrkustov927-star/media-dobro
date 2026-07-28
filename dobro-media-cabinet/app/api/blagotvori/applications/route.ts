@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBlagotvoriAdmin, isBlagotvoriConfigured } from '@/lib/blagotvori/supabaseAdmin';
+import {
+  formatBlagotvoriDate,
+  formatBlagotvoriTime,
+  sendBlagotvoriVk
+} from '@/lib/blagotvori/vkNotify';
 
 function normalizeContact(value: string) {
   const trimmed = value.trim().toLowerCase();
@@ -47,7 +52,7 @@ export async function POST(request: NextRequest) {
     const supabase = getBlagotvoriAdmin();
     const { data: vacancy, error: vacancyError } = await supabase
       .from('bt_vacancies')
-      .select('id,slots,is_active,event_date')
+      .select('id,title,slots,is_active,event_date,start_time')
       .eq('id', vacancyId)
       .maybeSingle();
 
@@ -93,6 +98,28 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    const occupiedSlots = (activeApplications || []).length + 1;
+    const totalSlots = Number(vacancy.slots) || 1;
+    const freeSlots = Math.max(0, totalSlots - occupiedSlots);
+    const vacancyIsFull = freeSlots === 0;
+
+    await sendBlagotvoriVk(
+      [
+        '🟢 Новая заявка на доброе дело',
+        '',
+        `Вакансия: ${vacancy.title}`,
+        `Дата: ${formatBlagotvoriDate(vacancy.event_date)}, ${formatBlagotvoriTime(vacancy.start_time)}`,
+        `Участник: ${volunteerName}`,
+        `Контакт: ${contact}`,
+        `Места: ${occupiedSlots} из ${totalSlots} занято`,
+        vacancyIsFull
+          ? '🔴 Вакансия заполнена — свободных мест больше нет.'
+          : `Свободно мест: ${freeSlots}`
+      ],
+      `application:${data.id}:created`
+    );
+
     return NextResponse.json({ ok: true, duplicate: false, application: data }, { status: 201 });
   } catch (error: any) {
     const message = error?.code === '23505'
