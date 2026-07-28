@@ -1,0 +1,26 @@
+@media (max-width: 640px) {
+  header [class*="topActions"] {
+    gap: 6px;
+  }
+
+  header [class*="topActions"] button {
+    min-height: 40px;
+    padding: 9px 11px;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  header [class*="topActions"] a {
+    min-height: 40px;
+    padding: 9px 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}
