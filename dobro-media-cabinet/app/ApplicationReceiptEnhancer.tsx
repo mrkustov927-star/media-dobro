@@ -26,11 +26,11 @@ function readReceipts(): StoredReceipt[] {
   }
 }
 
-function saveReceipt(receipt: StoredReceipt) {
+function saveReceipt(receipt: StoredReceipt, notify = true) {
   const current = readReceipts().filter(item => normalizeCode(item.access_code) !== normalizeCode(receipt.access_code));
   const next = [receipt, ...current].slice(0, 50);
   window.localStorage.setItem(storageKey, JSON.stringify(next));
-  window.dispatchEvent(new CustomEvent('blagotvori-access-saved', { detail: receipt }));
+  if (notify) window.dispatchEvent(new CustomEvent('blagotvori-access-saved', { detail: receipt }));
 }
 
 function applyParticipationBadges() {
@@ -132,7 +132,6 @@ function injectReceipt(receipt: StoredReceipt) {
 
 export default function ApplicationReceiptEnhancer() {
   useEffect(() => {
-    let stopped = false;
     const timers: Array<ReturnType<typeof setTimeout>> = [];
     const originalFetch = window.fetch.bind(window);
 
@@ -161,7 +160,7 @@ export default function ApplicationReceiptEnhancer() {
               saved_at: new Date().toISOString()
             };
 
-            saveReceipt(receipt);
+            saveReceipt(receipt, true);
             [120, 450, 1000].forEach(delay => timers.push(window.setTimeout(() => injectReceipt(receipt), delay)));
             scheduleApply();
           }
@@ -187,25 +186,23 @@ export default function ApplicationReceiptEnhancer() {
       }
     }
 
-    function handleSaved(event: Event) {
+    function handleImported(event: Event) {
       const receipt = (event as CustomEvent<StoredReceipt>).detail;
       if (receipt?.access_code) {
-        saveReceipt({ ...receipt, access_code: normalizeCode(receipt.access_code) });
+        saveReceipt({ ...receipt, access_code: normalizeCode(receipt.access_code) }, false);
         scheduleApply();
       }
     }
 
     document.addEventListener('click', handleClick, true);
-    window.addEventListener('blagotvori-access-imported', handleSaved as EventListener);
+    window.addEventListener('blagotvori-access-imported', handleImported as EventListener);
     scheduleApply();
 
     return () => {
-      stopped = true;
       if (window.fetch === wrappedFetch) window.fetch = originalFetch;
       document.removeEventListener('click', handleClick, true);
-      window.removeEventListener('blagotvori-access-imported', handleSaved as EventListener);
+      window.removeEventListener('blagotvori-access-imported', handleImported as EventListener);
       timers.forEach(timer => window.clearTimeout(timer));
-      void stopped;
     };
   }, []);
 
