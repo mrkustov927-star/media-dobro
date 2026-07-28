@@ -36,15 +36,33 @@ function normalizePersonKey(name: string, contact: string) {
   return `${normalizeText(name)}|${String(contact || '').replace(/\s+/g, '').toLocaleLowerCase('ru-RU')}`;
 }
 
-function toInitials(name: string) {
+function capitalize(value: string) {
+  if (!value) return '';
+  return value.charAt(0).toLocaleUpperCase('ru-RU') + value.slice(1).toLocaleLowerCase('ru-RU');
+}
+
+function looksLikeSurname(value: string) {
+  return /(ова|ева|ёва|ина|ына|ская|цкая|ский|цкий|ской|енко|ов|ев|ёв|ин|ын|ук|юк|ко|их|ых)$/iu.test(value);
+}
+
+function toShortName(name: string) {
   const parts = String(name || '')
     .trim()
     .replace(/\s+/g, ' ')
     .split(' ')
-    .filter(Boolean)
-    .slice(0, 2);
+    .filter(Boolean);
 
-  return parts.map(part => `${part.charAt(0).toLocaleUpperCase('ru-RU')}.`).join(' ');
+  if (!parts.length) return '';
+  if (parts.length === 1) return capitalize(parts[0]);
+
+  let surnameIndex = parts.findIndex(looksLikeSurname);
+  if (surnameIndex < 0) surnameIndex = 0;
+
+  const firstNameIndex = parts.findIndex((_, index) => index !== surnameIndex);
+  const surname = capitalize(parts[surnameIndex]);
+  const firstName = capitalize(parts[firstNameIndex]);
+
+  return firstName ? `${surname} ${firstName.charAt(0)}.` : surname;
 }
 
 export async function GET() {
@@ -55,6 +73,7 @@ export async function GET() {
         vacancies: demoVacancies.map(vacancy => ({
           ...vacancy,
           occupied_slots: Math.max(0, Number(vacancy.slots) - Number(vacancy.free_slots)),
+          participant_labels: [],
           participant_initials: []
         }))
       },
@@ -87,7 +106,7 @@ export async function GET() {
     for (const application of applications) {
       const people = peopleByVacancy.get(application.vacancy_id) || new Map<string, string>();
       const personKey = normalizePersonKey(application.volunteer_name, application.contact);
-      if (!people.has(personKey)) people.set(personKey, toInitials(application.volunteer_name));
+      if (!people.has(personKey)) people.set(personKey, toShortName(application.volunteer_name));
       peopleByVacancy.set(application.vacancy_id, people);
     }
 
@@ -105,13 +124,13 @@ export async function GET() {
 
       for (const vacancy of group) {
         const vacancyPeople = peopleByVacancy.get(vacancy.id);
-        vacancyPeople?.forEach((initials, personKey) => {
-          if (!people.has(personKey)) people.set(personKey, initials);
+        vacancyPeople?.forEach((label, personKey) => {
+          if (!people.has(personKey)) people.set(personKey, label);
         });
       }
 
-      const initials = Array.from(people.values()).filter(Boolean);
-      const occupiedSlots = initials.length;
+      const labels = Array.from(people.values()).filter(Boolean);
+      const occupiedSlots = labels.length;
       const slots = Math.max(...group.map(vacancy => Number(vacancy.slots) || 0), 1);
 
       return {
@@ -119,7 +138,8 @@ export async function GET() {
         slots,
         duties: Array.isArray(keeper.duties) ? keeper.duties : [],
         occupied_slots: occupiedSlots,
-        participant_initials: initials,
+        participant_labels: labels,
+        participant_initials: labels,
         free_slots: Math.max(0, slots - occupiedSlots)
       };
     });
