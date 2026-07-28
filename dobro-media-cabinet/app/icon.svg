@@ -1,7 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="15" fill="#D51116"/>
-  <path d="M16 20h9l4-6h12l4 6h4c4.4 0 8 3.6 8 8v19c0 4.4-3.6 8-8 8H16c-4.4 0-8-3.6-8-8V28c0-4.4 3.6-8 8-8Z" fill="#FFFFFF"/>
-  <circle cx="32.5" cy="37.5" r="12" fill="#244BBA"/>
-  <circle cx="32.5" cy="37.5" r="5.5" fill="#FFFFFF"/>
-  <circle cx="48" cy="28" r="3" fill="#D51116"/>
+  <defs>
+    <linearGradient id="bg" x1="8" y1="7" x2="57" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ED1C24"/>
+      <stop offset="1" stop-color="#FF625F"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0" cy="0" r="1" gradientTransform="translate(17 12) rotate(48) scale(49)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="17" fill="url(#bg)"/>
+  <rect width="64" height="64" rx="17" fill="url(#shine)"/>
+  <path fill="#FFFFFF" fill-rule="evenodd" d="M17 12h32v10H29v7h10c11 0 18 5.4 18 14s-7 14-18 14H17V12Zm12 26v10h9c4.8 0 7.5-1.7 7.5-5S42.8 38 38 38h-9Z"/>
 </svg>
