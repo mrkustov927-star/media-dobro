@@ -5,18 +5,27 @@ import { useEffect } from 'react';
 type PublicVacancy = {
   id: string;
   title: string;
+  participant_labels?: string[];
   participant_initials?: string[];
 };
 
-function participantText(vacancy: PublicVacancy) {
-  const initials = Array.isArray(vacancy.participant_initials)
-    ? vacancy.participant_initials.map(value => String(value).trim()).filter(Boolean)
-    : [];
-  if (!initials.length) return '';
+function participantLabels(vacancy: PublicVacancy) {
+  const source = Array.isArray(vacancy.participant_labels)
+    ? vacancy.participant_labels
+    : Array.isArray(vacancy.participant_initials)
+      ? vacancy.participant_initials
+      : [];
 
-  const visible = initials.slice(0, 3).join(', ');
-  const rest = initials.length - 3;
-  return rest > 0 ? `Уже участвуют: ${visible} и ещё ${rest}` : `Уже участвуют: ${visible}`;
+  return source.map(value => String(value).trim()).filter(Boolean);
+}
+
+function participantText(vacancy: PublicVacancy) {
+  const labels = participantLabels(vacancy);
+  if (!labels.length) return '';
+
+  const visible = labels.slice(0, 3).join(', ');
+  const rest = labels.length - 3;
+  return rest > 0 ? `Участвуют: ${visible} и ещё ${rest}` : `Участвуют: ${visible}`;
 }
 
 export default function ParticipantInitialsEnhancer() {
@@ -25,7 +34,7 @@ export default function ParticipantInitialsEnhancer() {
     let vacancies: PublicVacancy[] = [];
     const timers: Array<ReturnType<typeof setTimeout>> = [];
 
-    function apply() {
+    function applyCardBadges() {
       if (stopped) return;
 
       const candidates = Array.from(
@@ -68,7 +77,59 @@ export default function ParticipantInitialsEnhancer() {
       });
     }
 
-    function scheduleApply(delays = [0, 400, 1100]) {
+    function applyModalTeam() {
+      if (stopped) return;
+
+      const title = document.getElementById('vacancy-title');
+      const dialog = title?.closest<HTMLElement>('[role="dialog"]');
+      if (!title || !dialog) return;
+
+      const vacancy = vacancies.find(item => item.title === (title.textContent || '').trim());
+      const labels = vacancy ? participantLabels(vacancy) : [];
+      const existing = dialog.querySelector<HTMLElement>('[data-participant-team]');
+
+      if (!vacancy || !labels.length) {
+        existing?.remove();
+        return;
+      }
+
+      const signature = `${vacancy.id}|${labels.join('|')}`;
+      if (existing?.dataset.signature === signature) return;
+      existing?.remove();
+
+      const section = document.createElement('section');
+      section.className = 'participant-team-card';
+      section.setAttribute('data-participant-team', 'true');
+      section.dataset.signature = signature;
+
+      const heading = document.createElement('h3');
+      heading.textContent = 'Кто участвует';
+      section.appendChild(heading);
+
+      const lead = document.createElement('p');
+      lead.textContent = labels.length === 1 ? 'Активность уже взял волонтёр:' : 'Активность уже взяли волонтёры:';
+      section.appendChild(lead);
+
+      const list = document.createElement('ul');
+      labels.forEach(label => {
+        const item = document.createElement('li');
+        item.textContent = label;
+        list.appendChild(item);
+      });
+      section.appendChild(list);
+
+      const facts = dialog.querySelector<HTMLElement>('[class*="modalFacts"]');
+      if (facts?.nextSibling) facts.parentElement?.insertBefore(section, facts.nextSibling);
+      else if (facts?.parentElement) facts.parentElement.appendChild(section);
+      else title.insertAdjacentElement('afterend', section);
+    }
+
+    function apply() {
+      applyCardBadges();
+      applyModalTeam();
+    }
+
+    function scheduleApply(delays = [0, 100, 300]) {
       delays.forEach(delay => timers.push(setTimeout(apply, delay)));
     }
 
@@ -78,17 +139,21 @@ export default function ParticipantInitialsEnhancer() {
         if (!response.ok || stopped) return;
         const json = await response.json();
         vacancies = Array.isArray(json.vacancies) ? json.vacancies : [];
-        scheduleApply();
+        scheduleApply([0, 350, 900]);
       } catch {
-        // Основной календарь продолжает работать без дополнительного индикатора.
+        // Основной календарь продолжает работать без дополнительного списка участников.
       }
     }
 
     function handleClick(event: MouseEvent) {
       const target = event.target instanceof HTMLElement ? event.target : null;
-      if (!target?.closest('button[type="submit"]')) return;
-      timers.push(setTimeout(() => { void refresh(); }, 1200));
-      timers.push(setTimeout(() => { void refresh(); }, 2800));
+      if (!target?.closest('button')) return;
+
+      scheduleApply();
+      if (target.closest('button[type="submit"]')) {
+        timers.push(setTimeout(() => { void refresh(); }, 1200));
+        timers.push(setTimeout(() => { void refresh(); }, 2600));
+      }
     }
 
     document.addEventListener('click', handleClick, true);
