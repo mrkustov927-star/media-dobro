@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { demoVacancies } from '@/lib/blagotvori/demoVacancies';
+import { summerVacancies } from '@/lib/blagotvori/summerVacancies';
 import { getBlagotvoriAdmin, isBlagotvoriConfigured } from '@/lib/blagotvori/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,42 @@ const occupiedStatuses = [
   'На доработке',
   'Часы зачтены'
 ];
+
+let summerSeedPromise: Promise<void> | null = null;
+
+function vacancyKey(title: string, eventDate: string) {
+  return `${title.trim()}|${eventDate}`;
+}
+
+function ensureSummerVacancies() {
+  if (!summerSeedPromise) {
+    summerSeedPromise = (async () => {
+      const supabase = getBlagotvoriAdmin();
+      const titles = summerVacancies.map(item => item.title);
+      const { data: existingRows, error: existingError } = await supabase
+        .from('bt_vacancies')
+        .select('title,event_date')
+        .in('title', titles);
+
+      if (existingError) throw existingError;
+
+      const existing = new Set(
+        (existingRows || []).map(row => vacancyKey(String(row.title || ''), String(row.event_date || '')))
+      );
+      const missing = summerVacancies.filter(item => !existing.has(vacancyKey(item.title, item.event_date)));
+
+      if (!missing.length) return;
+
+      const { error: insertError } = await supabase.from('bt_vacancies').insert(missing);
+      if (insertError) throw insertError;
+    })().catch(error => {
+      summerSeedPromise = null;
+      throw error;
+    });
+  }
+
+  return summerSeedPromise;
+}
 
 function normalizePersonKey(name: string, contact: string) {
   return `${name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU')}|${contact.replace(/\s+/g, '').toLocaleLowerCase('ru-RU')}`;
@@ -45,6 +82,12 @@ export async function GET() {
   }
 
   try {
+    try {
+      await ensureSummerVacancies();
+    } catch (seedError) {
+      console.error('Не удалось автоматически добавить летние вакансии:', seedError);
+    }
+
     const supabase = getBlagotvoriAdmin();
     const { data: vacancies, error: vacanciesError } = await supabase
       .from('bt_vacancies')
