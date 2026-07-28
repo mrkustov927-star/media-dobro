@@ -49,17 +49,35 @@
 @media (max-width: 720px) {
   .link {
     right: 12px;
-    bottom: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: 56px;
+    height: 56px;
     min-width: 0;
-    padding: 11px 13px;
-    border-radius: 15px;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    place-items: center;
+    border-radius: 18px;
   }
 
+  .link b,
   .link small {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .link > span {
+    width: 38px;
+    height: 38px;
     grid-row: 1;
+    border-radius: 12px;
   }
 }
