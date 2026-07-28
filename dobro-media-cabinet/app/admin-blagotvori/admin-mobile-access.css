@@ -1,0 +1,30 @@
+@media (max-width: 640px) {
+  [class*="topActions"] {
+    gap: 7px !important;
+  }
+
+  [class*="topActions"] a {
+    display: none !important;
+  }
+
+  [class*="topActions"] button {
+    min-height: 42px !important;
+    padding: 9px 12px !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff !important;
+    background: #172033 !important;
+    font-size: 12px !important;
+  }
+
+  [class*="topActions"] button::before {
+    content: '↻';
+    margin-right: 6px;
+    font-size: 15px;
+  }
+
+  [class*="vacancyCard"] {
+    scroll-margin-top: 78px;
+  }
+}
