@@ -59,9 +59,30 @@ export default function AdminVacancyDeleteEnhancer() {
       return { response, json };
     }
 
+    function refreshCabinetWithoutLogout(article: HTMLElement, vacancyId: string) {
+      vacancies = vacancies.filter(item => item.id !== vacancyId);
+      article.remove();
+
+      const refreshButton = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+        candidate => candidate.textContent?.trim() === 'Обновить'
+      );
+
+      if (refreshButton && !refreshButton.disabled) {
+        refreshButton.click();
+      } else {
+        scheduleApply([0, 200]);
+      }
+    }
+
     async function removeVacancy(vacancy: AdminVacancy, button: HTMLButtonElement) {
       if (!passwordRef.current) {
         window.alert('Не удалось получить пароль текущей сессии. Обновите страницу и снова войдите в кабинет.');
+        return;
+      }
+
+      const article = button.closest<HTMLElement>('article[class*="vacancyCard"]');
+      if (!article) {
+        window.alert('Не удалось определить карточку активности. Обновите список и повторите удаление.');
         return;
       }
 
@@ -96,17 +117,19 @@ export default function AdminVacancyDeleteEnhancer() {
         if (!response.ok) throw new Error(json.error || 'Не удалось удалить активность.');
 
         const removed = Number(json.deleted_applications) || 0;
+        refreshCabinetWithoutLogout(article, vacancy.id);
         window.alert(
           removed > 0
             ? `Активность удалена. Вместе с ней удалено связанных записей: ${removed}.`
             : 'Активность удалена.'
         );
-        window.location.reload();
       } catch (error: unknown) {
         window.alert(error instanceof Error ? error.message : 'Не удалось удалить активность.');
       } finally {
-        button.disabled = false;
-        button.textContent = initialText;
+        if (button.isConnected) {
+          button.disabled = false;
+          button.textContent = initialText;
+        }
       }
     }
 
