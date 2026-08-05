@@ -16,7 +16,7 @@ type VacancyPreset = {
   slots: number;
   min_age: number;
   max_age: number;
-  format: string;
+  format: 'Очно' | 'Дистанционно';
   confirmation_type: string;
   confirmation_text: string;
   description: string;
@@ -42,6 +42,12 @@ function normalizeTime(value: unknown) {
   return time;
 }
 
+function durationMinutes(start: string, end: string) {
+  const startMinutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5));
+  const endMinutes = Number(end.slice(0, 2)) * 60 + Number(end.slice(3, 5));
+  return endMinutes - startMinutes;
+}
+
 function buildPresets(shelterStart: string, shelterEnd: string): VacancyPreset[] {
   return [
     {
@@ -55,7 +61,7 @@ function buildPresets(shelterStart: string, shelterEnd: string): VacancyPreset[]
       slots: 50,
       min_age: 13,
       max_age: 99,
-      format: 'Онлайн',
+      format: 'Дистанционно',
       confirmation_type: 'Ссылка на материал',
       confirmation_text:
         'Прикрепите ссылку на опубликованный пост или скриншот публикации. Акция проходит с 10 по 14 августа. Хештеги: #ДвижениеПервых10 #ПервыеКемь #ЗаботаОМеньших #КалендарьПервых',
@@ -84,7 +90,7 @@ function buildPresets(shelterStart: string, shelterEnd: string): VacancyPreset[]
       slots: 15,
       min_age: 13,
       max_age: 99,
-      format: 'Онлайн',
+      format: 'Дистанционно',
       confirmation_type: 'Ссылка или файл',
       confirmation_text:
         'Передайте организатору готовую карточку или заполненную форму с проверенными сведениями о животном. Активность проходит 10 и 11 августа.',
@@ -137,11 +143,7 @@ function buildPresets(shelterStart: string, shelterEnd: string): VacancyPreset[]
       start_time: shelterStart,
       end_time: shelterEnd,
       place: 'Приют «Уши, лапы, хвост»',
-      estimated_minutes: Math.max(
-        60,
-        (Number(shelterEnd.slice(0, 2)) * 60 + Number(shelterEnd.slice(3, 5))) -
-          (Number(shelterStart.slice(0, 2)) * 60 + Number(shelterStart.slice(3, 5)))
-      ),
+      estimated_minutes: Math.max(60, durationMinutes(shelterStart, shelterEnd)),
       slots: 10,
       min_age: 13,
       max_age: 99,
@@ -175,11 +177,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const shelterStart = normalizeTime(body.shelter_start_time);
     const shelterEnd = normalizeTime(body.shelter_end_time);
-
-    const startMinutes = Number(shelterStart.slice(0, 2)) * 60 + Number(shelterStart.slice(3, 5));
-    const endMinutes = Number(shelterEnd.slice(0, 2)) * 60 + Number(shelterEnd.slice(3, 5));
-    if (endMinutes <= startMinutes) {
-      return NextResponse.json({ error: 'Время окончания посещения приюта должно быть позже времени начала.' }, { status: 400 });
+    if (durationMinutes(shelterStart, shelterEnd) <= 0) {
+      return NextResponse.json(
+        { error: 'Время окончания посещения приюта должно быть позже времени начала.' },
+        { status: 400 }
+      );
     }
 
     const supabase = getBlagotvoriAdmin();
@@ -194,7 +196,6 @@ export async function POST(request: NextRequest) {
         .eq('title', preset.title)
         .eq('event_date', preset.event_date)
         .maybeSingle();
-
       if (findError) throw findError;
 
       if (existing?.id) {
