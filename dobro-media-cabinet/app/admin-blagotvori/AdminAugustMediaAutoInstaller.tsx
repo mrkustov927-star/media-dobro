@@ -2,10 +2,13 @@
 
 import { useEffect, useRef } from 'react';
 
-const storageKey = 'blagotvori-august-media-installed-v1';
+const storageKey = 'blagotvori-august-activities-installed-v2';
 const requiredVacancies = [
   ['Медиа-команда выезда в приют «Уши, лапы, хвост»', '2026-08-14'],
-  ['Медиа-команда акции «Символ народа»', '2026-08-22']
+  ['Помощь в установке выставки «В тылу ковалась Победа: Карельский фронт»', '2026-08-16'],
+  ['Медиа-команда акции «Символ народа»', '2026-08-22'],
+  ['Подготовка видеоматериала или публикации «Памяти Курской дуги»', '2026-08-23'],
+  ['Кино снималось здесь: Кемь и Карелия', '2026-08-25']
 ] as const;
 
 function hasAllVacancies(value: unknown) {
@@ -32,7 +35,7 @@ export default function AdminAugustMediaAutoInstaller() {
       return new URL(raw, window.location.origin);
     }
 
-    async function installMediaVacancies(password: string, vacancies: unknown) {
+    async function installAugustVacancies(password: string, vacancies: unknown) {
       if (stopped || running || !password) return;
 
       if (hasAllVacancies(vacancies)) {
@@ -52,13 +55,13 @@ export default function AdminAugustMediaAutoInstaller() {
           }
         });
         const json = await response.json();
-        if (!response.ok) throw new Error(json.error || 'Не удалось добавить медиавакансии.');
+        if (!response.ok) throw new Error(json.error || 'Не удалось добавить августовские активности.');
 
         window.localStorage.setItem(storageKey, 'done');
 
         if (Number(json.created) > 0) {
           window.alert(
-            `Добавлены медиавакансии на 14 и 22 августа: ${json.created}. Список вакансий будет обновлён.`
+            `Добавлены новые августовские активности: ${json.created}. Список вакансий будет обновлён.`
           );
 
           const refreshButton = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
@@ -67,7 +70,7 @@ export default function AdminAugustMediaAutoInstaller() {
           window.setTimeout(() => refreshButton?.click(), 100);
         }
       } catch (error: unknown) {
-        window.alert(error instanceof Error ? error.message : 'Не удалось добавить медиавакансии.');
+        window.alert(error instanceof Error ? error.message : 'Не удалось добавить августовские активности.');
       } finally {
         running = false;
       }
@@ -87,7 +90,7 @@ export default function AdminAugustMediaAutoInstaller() {
         void response
           .clone()
           .json()
-          .then(json => installMediaVacancies(passwordRef.current, json?.vacancies))
+          .then(json => installAugustVacancies(passwordRef.current, json?.vacancies))
           .catch(() => {
             // Основной кабинет продолжит работать, если автоматическое добавление не выполнилось.
           });
