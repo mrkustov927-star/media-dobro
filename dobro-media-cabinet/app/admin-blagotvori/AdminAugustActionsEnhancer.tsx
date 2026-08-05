@@ -3,14 +3,34 @@
 import { useEffect, useRef, useState } from 'react';
 import styles from './admin-august-actions.module.css';
 
+const augustVacancies = [
+  ['Онлайн-акция «Расскажи о своём друге»', '2026-08-10'],
+  ['Сбор карточек для выставки «Носики Первых»', '2026-08-10'],
+  ['Помощь в оформлении выставки «Носики Первых»', '2026-08-12'],
+  ['Добровольческий выезд в приют «Уши, лапы, хвост»', '2026-08-14']
+] as const;
+
 function normalizeTime(value: string) {
   const time = value.trim();
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? time : null;
 }
 
+function hasAllAugustVacancies(value: unknown) {
+  if (!Array.isArray(value)) return false;
+
+  return augustVacancies.every(([title, eventDate]) =>
+    value.some(vacancy => {
+      if (!vacancy || typeof vacancy !== 'object') return false;
+      const item = vacancy as { title?: unknown; event_date?: unknown };
+      return item.title === title && item.event_date === eventDate;
+    })
+  );
+}
+
 export default function AdminAugustActionsEnhancer() {
   const passwordRef = useRef('');
-  const [visible, setVisible] = useState(false);
+  const [cabinetReady, setCabinetReady] = useState(false);
+  const [cardsExist, setCardsExist] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -19,17 +39,36 @@ export default function AdminAugustActionsEnhancer() {
 
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      if (url.includes('/api/blagotvori/admin')) {
-        const headers = new Headers(init?.headers);
+      const requestMethod = input instanceof Request ? input.method : undefined;
+      const method = String(init?.method || requestMethod || 'GET').toUpperCase();
+      const parsedUrl = new URL(url, window.location.origin);
+
+      if (parsedUrl.pathname === '/api/blagotvori/admin') {
+        const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
         const password = headers.get('x-admin-password');
         if (password) passwordRef.current = password;
       }
-      return originalFetch(input, init);
+
+      const response = await originalFetch(input, init);
+
+      if (parsedUrl.pathname === '/api/blagotvori/admin' && method === 'GET' && response.ok) {
+        void response
+          .clone()
+          .json()
+          .then(json => {
+            setCardsExist(hasAllAugustVacancies(json?.vacancies));
+          })
+          .catch(() => {
+            // Основной кабинет продолжит работать, даже если проверка карточек не удалась.
+          });
+      }
+
+      return response;
     };
 
     function detectCabinet() {
       const buttons = Array.from(document.querySelectorAll('button'));
-      setVisible(buttons.some(button => /Создать вакансию|Новая вакансия/.test(button.textContent || '')));
+      setCabinetReady(buttons.some(button => /Создать вакансию|Новая вакансия/.test(button.textContent || '')));
     }
 
     function capturePassword(event: Event) {
@@ -113,6 +152,7 @@ export default function AdminAugustActionsEnhancer() {
       if (!response.ok) throw new Error(json.error || 'Не удалось добавить карточки.');
 
       const result = `Готово: создано ${json.created}, обновлено ${json.updated}.`;
+      setCardsExist(true);
       setMessage(result);
       window.alert(`${result}\n\nСтраница кабинета будет обновлена.`);
       window.location.reload();
@@ -125,7 +165,7 @@ export default function AdminAugustActionsEnhancer() {
     }
   }
 
-  if (!visible) return null;
+  if (!cabinetReady || cardsExist) return null;
 
   return (
     <aside className={styles.panel} aria-label="Августовские акции">
