@@ -36,8 +36,10 @@ export default function PublicSitePolishEnhancer() {
         if (title.textContent?.trim() !== 'Получи часы') return;
         const paragraph = title.nextElementSibling;
         if (paragraph instanceof HTMLElement) {
-          paragraph.textContent =
-            'После выполнения отметь участие или сдачу материала в разделе «Мои заявки и часы». Организатор проверит отметку и учтёт часы на Добро.рф.';
+          setText(
+            paragraph,
+            'После выполнения отметь участие или сдачу материала в разделе «Мои заявки и часы». Организатор проверит отметку и учтёт часы на Добро.рф.'
+          );
         }
       });
 
@@ -45,10 +47,10 @@ export default function PublicSitePolishEnhancer() {
         const summary = details.querySelector('summary');
         if (summary?.textContent?.trim() !== 'Как подтвердить доброе дело?') return;
         const paragraph = details.querySelector('p');
-        if (paragraph) {
-          paragraph.textContent =
-            'Загружать файлы, фотографии и ссылки на этом сайте не нужно. После выполнения открой раздел «Мои заявки и часы» и выбери: «Я участвовал(а)» или «Я сдал(а) материал». Отметка появится у организатора.';
-        }
+        setText(
+          paragraph,
+          'Загружать файлы, фотографии и ссылки на этом сайте не нужно. После выполнения открой раздел «Мои заявки и часы» и выбери: «Я участвовал(а)» или «Я сдал(а) материал». Отметка появится у организатора.'
+        );
       });
 
       const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
@@ -56,12 +58,15 @@ export default function PublicSitePolishEnhancer() {
         const category = dialog.querySelector<HTMLElement>('[class*="modalCategory"]')?.textContent || '';
         dialog.querySelectorAll<HTMLHeadingElement>('h3').forEach(title => {
           if (title.textContent?.trim() !== 'Как подтвердить участие' && title.textContent?.trim() !== 'Как отметить выполнение') return;
-          title.textContent = 'Как отметить выполнение';
+          setText(title, 'Как отметить выполнение');
           const paragraph = title.nextElementSibling;
           if (!(paragraph instanceof HTMLElement)) return;
-          paragraph.textContent = category.includes('Медиа') || category.includes('Дистанционные')
-            ? 'На этом сайте не нужно загружать материалы или ссылки. После выполнения открой раздел «Мои заявки и часы» и нажми «Я сдал(а) материал». Организатор увидит отметку и проверит результат на Добро.рф.'
-            : 'После участия открой раздел «Мои заявки и часы» и нажми «Я участвовал(а)». Организатор увидит отметку и проверит участие на Добро.рф.';
+          setText(
+            paragraph,
+            category.includes('Медиа') || category.includes('Дистанционные')
+              ? 'На этом сайте не нужно загружать материалы или ссылки. После выполнения открой раздел «Мои заявки и часы» и нажми «Я сдал(а) материал». Организатор увидит отметку и проверит результат на Добро.рф.'
+              : 'После участия открой раздел «Мои заявки и часы» и нажми «Я участвовал(а)». Организатор увидит отметку и проверит участие на Добро.рф.'
+          );
         });
       }
 
