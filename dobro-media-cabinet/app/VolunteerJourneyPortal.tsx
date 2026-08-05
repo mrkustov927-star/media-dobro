@@ -15,13 +15,14 @@ export default function VolunteerJourneyPortal() {
     if (pathname !== '/') return;
     const timer = window.setTimeout(() => {
       const main = document.querySelector('main');
-      const firstSection = main?.querySelector(':scope > section');
-      if (!main || !firstSection) return;
+      const nearestSection = document.getElementById('good-deeds');
+      if (!main || !nearestSection) return;
+
       let node = document.getElementById('volunteer-journey-host');
       if (!node) {
         node = document.createElement('div');
         node.id = 'volunteer-journey-host';
-        firstSection.insertAdjacentElement('afterend', node);
+        nearestSection.insertAdjacentElement('afterend', node);
       }
       setHost(node);
     }, 0);
