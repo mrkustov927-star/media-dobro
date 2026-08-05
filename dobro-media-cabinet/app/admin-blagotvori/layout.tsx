@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import AdminVacancyTeamEnhancer from './AdminVacancyTeamEnhancer';
 import AdminVacancyDeleteEnhancer from './AdminVacancyDeleteEnhancer';
 import AdminAugustMediaAutoInstaller from './AdminAugustMediaAutoInstaller';
+import AdminParticipationMarkEnhancer from './AdminParticipationMarkEnhancer';
 
 export default function AdminBlagotvoriLayout({ children }: { children: ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export default function AdminBlagotvoriLayout({ children }: { children: ReactNod
       <AdminVacancyTeamEnhancer />
       <AdminVacancyDeleteEnhancer />
       <AdminAugustMediaAutoInstaller />
+      <AdminParticipationMarkEnhancer />
       {children}
     </>
   );
