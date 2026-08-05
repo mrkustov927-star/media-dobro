@@ -1,0 +1,18 @@
+.deleteButton {
+  margin-left: auto !important;
+  border: 1px solid rgba(190, 24, 36, 0.35) !important;
+  background: #fff5f5 !important;
+  color: #b4232f !important;
+  box-shadow: none !important;
+}
+
+.deleteButton:hover:not(:disabled) {
+  border-color: #b4232f !important;
+  background: #b4232f !important;
+  color: #ffffff !important;
+}
+
+.deleteButton:disabled {
+  cursor: wait !important;
+  opacity: 0.65 !important;
+}
