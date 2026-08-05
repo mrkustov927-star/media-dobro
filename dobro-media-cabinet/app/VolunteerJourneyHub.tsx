@@ -11,8 +11,6 @@ type JourneyApplication = {
   hours_confirmed: boolean;
   dobro_hours_entered: boolean;
   admin_comment: string | null;
-  evidence_comment: string | null;
-  evidence_url: string | null;
   vacancy: {
     id: string;
     title: string;
@@ -52,10 +50,17 @@ function statusStep(status: string) {
   return map[status] ?? 1;
 }
 
+function displayStatus(status: string) {
+  if (status === 'Отчёт отправлен') return 'Отметка отправлена';
+  if (status === 'На доработке') return 'Нужно уточнение';
+  return status;
+}
+
 function formatDate(value?: string) {
   if (!value) return '';
   const [year, month, day] = value.split('-').map(Number);
-  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(new Date(Date.UTC(year, month - 1, day)));
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' })
+    .format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 export default function VolunteerJourneyHub({ vacancies, onOpenVacancy }: Props) {
@@ -66,6 +71,9 @@ export default function VolunteerJourneyHub({ vacancies, onOpenVacancy }: Props)
   const [statusMessage, setStatusMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [lookupName, setLookupName] = useState('');
+  const [lookupContact, setLookupContact] = useState('');
+  const [markingId, setMarkingId] = useState('');
 
   const recommendations = useMemo(() => {
     return vacancies
@@ -77,7 +85,6 @@ export default function VolunteerJourneyHub({ vacancies, onOpenVacancy }: Props)
 
   async function findApplications(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
     setLoading(true);
     setStatusMessage('');
     setSearched(true);
@@ -85,7 +92,7 @@ export default function VolunteerJourneyHub({ vacancies, onOpenVacancy }: Props)
       const response = await fetch('/api/blagotvori/my-applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ volunteer_name: data.get('volunteer_name'), contact: data.get('contact') })
+        body: JSON.stringify({ volunteer_name: lookupName, contact: lookupContact })
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Не удалось проверить заявки.');
@@ -95,6 +102,37 @@ export default function VolunteerJourneyHub({ vacancies, onOpenVacancy }: Props)
       setStatusMessage(error?.message || 'Не удалось проверить заявки.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function markCompletion(applicationId: string, completionType: 'attended' | 'material') {
+    if (markingId) return;
+    setMarkingId(applicationId);
+    setStatusMessage('');
+    try {
+      const response = await fetch('/api/blagotvori/volunteer-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          application_id: applicationId,
+          volunteer_name: lookupName,
+          contact: lookupContact,
+          completion_type: completionType
+        })
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Не удалось отправить отметку.');
+
+      setApplications(current => current.map(application =>
+        application.id === applicationId
+          ? { ...application, status: json.application?.status || 'Отчёт отправлен' }
+          : application
+      ));
+      setStatusMessage(json.message || 'Отметка отправлена организатору.');
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Не удалось отправить отметку.');
+    } finally {
+      setMarkingId('');
     }
   }
 
@@ -113,10 +151,10 @@ export default function VolunteerJourneyHub({ vacancies, onOpenVacancy }: Props)
           <p>Выбери дело, проверь заявку или узнай, как наставнику собрать свою команду.</p>
         </div>
 
-        <div className={styles.tabs} role="tablist">
-          <button type="button" data-active={tab === 'match'} onClick={() => setTab('match')}>✨ Подобрать дело</button>
-          <button type="button" data-active={tab === 'status'} onClick={() => setTab('status')}>◎ Мои заявки и часы</button>
-          <button type="button" data-active={tab === 'mentor'} onClick={() => setTab('mentor')}>🤝 Наставникам</button>
+        <div className={styles.tabs} role="tablist" aria-label="Маршрут волонтёра">
+          <button type="button" role="tab" aria-selected={tab === 'match'} data-active={tab === 'match'} onClick={() => setTab('match')}>✨ Подобрать дело</button>
+          <button type="button" role="tab" aria-selected={tab === 'status'} data-active={tab === 'status'} onClick={() => setTab('status')}>◎ Мои заявки и часы</button>
+          <button type="button" role="tab" aria-selected={tab === 'mentor'} data-active={tab === 'mentor'} onClick={() => setTab('mentor')}>🤝 Наставникам</button>
         </div>
 
         {tab === 'match' && (
@@ -131,7 +169,9 @@ export default function VolunteerJourneyHub({ vacancies, onOpenVacancy }: Props)
             </div>
             <div className={styles.formatRow}>
               <span>Как удобнее участвовать?</span>
-              {(['Любой', 'Очно', 'Дистанционно'] as const).map(item => <button type="button" key={item} data-active={format === item} onClick={() => setFormat(item)}>{item}</button>)}
+              {(['Любой', 'Очно', 'Дистанционно'] as const).map(item => (
+                <button type="button" key={item} data-active={format === item} onClick={() => setFormat(item)}>{item}</button>
+              ))}
             </div>
             <div className={styles.results}>
               {recommendations.length ? recommendations.map(vacancy => (
@@ -151,27 +191,43 @@ export default function VolunteerJourneyHub({ vacancies, onOpenVacancy }: Props)
           <div className={styles.panel}>
             <div className={styles.statusLayout}>
               <form className={styles.statusForm} onSubmit={findApplications}>
-                <span>ЛИЧНЫЙ МАРШРУТ</span><h3>Узнай, что происходит с заявкой</h3>
-                <p>Введи имя и контакт точно так же, как при записи. Эти данные используются только для поиска твоих заявок.</p>
-                <label>Имя и фамилия<input name="volunteer_name" required placeholder="Например: Анна Иванова" /></label>
-                <label>Контакт<input name="contact" required placeholder="Телефон или ссылка на профиль" /></label>
+                <span>ЛИЧНЫЙ МАРШРУТ</span><h3>Проверь заявку и отметь выполнение</h3>
+                <p>Введи имя и контакт точно так же, как при записи. Загружать файлы, фотографии или ссылки не нужно.</p>
+                <label>Имя и фамилия<input name="volunteer_name" required value={lookupName} onChange={event => setLookupName(event.target.value)} placeholder="Например: Анна Иванова" /></label>
+                <label>Контакт<input name="contact" required value={lookupContact} onChange={event => setLookupContact(event.target.value)} placeholder="Телефон или ссылка на профиль" /></label>
                 <button type="submit" disabled={loading}>{loading ? 'Проверяем…' : 'Показать мои заявки'}</button>
                 {statusMessage && <small>{statusMessage}</small>}
               </form>
               <div className={styles.applicationResults}>
-                {!searched && <div className={styles.statusPreview}><b>Здесь появится путь заявки</b><span>Заявка → подтверждение → доброе дело → отчёт → часы</span></div>}
+                {!searched && <div className={styles.statusPreview}><b>Здесь появится путь заявки</b><span>Заявка → подтверждение → доброе дело → отметка → часы</span></div>}
                 {searched && !loading && !applications.length && !statusMessage && <div className={styles.empty}>Заявок с такими данными не найдено. Проверь написание имени и контакта.</div>}
                 {applications.map(application => {
                   const step = statusStep(application.status);
+                  const canMark = !['Отчёт отправлен', 'Часы зачтены', 'Отменено', 'Не участвовал'].includes(application.status);
                   return (
                     <article className={styles.applicationCard} key={application.id}>
-                      <div className={styles.applicationHead}><div><small>{application.status}</small><h3>{application.vacancy?.title || 'Доброе дело'}</h3><p>{formatDate(application.vacancy?.event_date)} · {application.vacancy?.start_time?.slice(0, 5)} · {application.vacancy?.place}</p></div>{application.actual_minutes ? <b>{application.actual_minutes / 60} ч.</b> : null}</div>
+                      <div className={styles.applicationHead}>
+                        <div>
+                          <small>{displayStatus(application.status)}</small>
+                          <h3>{application.vacancy?.title || 'Доброе дело'}</h3>
+                          <p>{formatDate(application.vacancy?.event_date)} · {application.vacancy?.start_time?.slice(0, 5)} · {application.vacancy?.place}</p>
+                        </div>
+                        {application.actual_minutes ? <b>{application.actual_minutes / 60} ч.</b> : null}
+                      </div>
                       <div className={styles.progress} aria-label={`Этап ${step} из 5`}>
-                        {['Заявка', 'Подтверждение', 'Участие', 'Отчёт', 'Часы'].map((label, index) => <span key={label} data-done={step >= index + 1}><i>{step >= index + 1 ? '✓' : index + 1}</i><small>{label}</small></span>)}
+                        {['Заявка', 'Подтверждение', 'Участие', 'Отметка', 'Часы'].map((label, index) => (
+                          <span key={label} data-done={step >= index + 1}><i>{step >= index + 1 ? '✓' : index + 1}</i><small>{label}</small></span>
+                        ))}
                       </div>
                       {application.admin_comment && <p className={styles.adminComment}><b>Комментарий организатора:</b> {application.admin_comment}</p>}
                       <div className={styles.applicationActions}>
-                        {step >= 3 && !application.hours_confirmed && <a href="/report-blagotvori">Отправить отчёт</a>}
+                        {canMark && (
+                          <div className={styles.resultActions}>
+                            <button type="button" disabled={markingId === application.id} onClick={() => markCompletion(application.id, 'attended')}>Я участвовал(а)</button>
+                            <button type="button" disabled={markingId === application.id} onClick={() => markCompletion(application.id, 'material')}>Я сдал(а) материал</button>
+                          </div>
+                        )}
+                        {application.status === 'Отчёт отправлен' && <span>✓ Отметка отправлена организатору</span>}
                         {application.dobro_hours_entered && <span>✓ Часы внесены на Добро.рф</span>}
                       </div>
                     </article>
@@ -188,9 +244,9 @@ export default function VolunteerJourneyHub({ vacancies, onOpenVacancy }: Props)
             <div className={styles.mentorCards}>
               <article><b>1</b><h4>Подберите формат</h4><p>Очное событие, медиазадача или помощь из дома — с учётом возраста и интересов ребят.</p></article>
               <article><b>2</b><h4>Запишитесь вместе</h4><p>Каждый участник подаёт свою заявку, а наставник помогает не потерять дату и инструкции.</p></article>
-              <article><b>3</b><h4>Обсудите результат</h4><p>После дела важно не только отправить отчёт, но и заметить, что получилось и кому это помогло.</p></article>
+              <article><b>3</b><h4>Отметьте выполнение</h4><p>После дела ребёнок выбирает «Я участвовал(а)» или «Я сдал(а) материал». Организатор проверяет отметку и часы на Добро.рф.</p></article>
             </div>
-            <div className={styles.mentorNote}><b>Важно</b><p>Условия конкретной вакансии имеют приоритет. Если участнику требуется сопровождение или особые условия, заранее свяжитесь с организатором.</p></div>
+            <div className={styles.mentorNote}><b>Важно</b><p>Загрузка материалов на этом сайте отключена. Отметка ребёнка сообщает организатору о выполнении, но не заменяет проверку результата и не начисляет часы автоматически.</p></div>
           </div>
         )}
       </div>
